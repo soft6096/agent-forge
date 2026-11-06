@@ -63,8 +63,11 @@ ITEMS = [
 PROMPT_DIR_NAMES = ("prompts", "prompt", "system_prompts")
 EVAL_DIR_NAMES = ("evals", "eval", "evaluation")
 
-# 脚本自身不参与扫描：规则定义行本身就是关键词，自扫会产生假阳性证据
+# 脚本自身不参与扫描：规则定义行本身就是关键词，自扫会产生假阳性证据。
+# 按文件名排除，不只按当前运行路径——同一脚本可能存在多份副本（工作区 + 安装副本 + 拷进项目），
+# 只排除运行中的那一份，其余副本仍会被当成"实现"而把 27 项判成 pass。
 SELF_PATH = Path(__file__).resolve()
+SELF_NAMES = {"check_agent_standards.py"}
 
 
 def collect(scope: Path):
@@ -75,6 +78,8 @@ def collect(scope: Path):
         for name in filenames:
             p = Path(dirpath) / name
             if p.suffix.lower() not in SCAN_EXTS:
+                continue
+            if name in SELF_NAMES:
                 continue
             try:
                 if p.resolve() == SELF_PATH:
