@@ -1,6 +1,6 @@
 # agent-forge 技能地图（SKILL-MAP）
 
-> 状态：第一批 5 个技能已落地并安装（agent-dev-workflow / agent-core-standards / agent-eval-standards / check-agent-standards / agent-forge-source-law）；第二、三批 6 个仍在规划，尚未创建目录。
+> 状态：11 个技能中 10 个已落地并安装（第一批 5 个 + 第二批 5 个）；仅 agent-skill-authoring 仍在规划，尚未创建目录。
 > 本文是后续所有实现的基准，技能清单、职责边界、产物编号、分批计划以本文为准；改动先改本文再改代码。
 
 ---
@@ -93,7 +93,7 @@
 | 10 | check-agent-standards | 核对 | 可机械判定的规范兜底扫描 + 证据报告 | 核对报告（JSON/MD） |
 | 11 | agent-forge-source-law | 元 | 区分开发源与安装产物，禁止拿源目录当安装源 | 安装回执 |
 
-> 落地状态：# 1、2、6、10、11 已发布（第一批）；# 3、4、5、7、8、9 为规划中，无对应目录。
+> 落地状态：# 1~10 已发布；# 11（agent-skill-authoring）为规划中，无对应目录。
 
 ---
 
@@ -240,19 +240,19 @@
 
 | 步骤 | 必须加载 |
 |---|---|
-| 0.0 agent 项目初始化 | core + ops（规划中，骨架与埋点）+ tool（规划中，工具清单初稿） |
+| 0.0 agent 项目初始化 | core + ops（骨架与埋点）+ tool（工具清单初稿） |
 | 0.5 存量 agent 扫描 | 无强制，按扫描结果按需加载 |
 | 1.1 能力清单 | 无 |
-| 1.2 失败模式 | safety（规划中）+ core |
+| 1.2 失败模式 | safety + core |
 | 2.1 评测口径 | eval |
-| 3.1 架构方案 | core + context-memory（规划中）+ tool（规划中，+ rag / ops 若涉及，均规划中） |
-| 3.2 工具契约 | tool（规划中） |
+| 3.1 架构方案 | core + context-memory + tool（+ rag / ops 若涉及） |
+| 3.2 工具契约 | tool |
 | 4.1 任务拆解 | eval（评测集建设单列 Phase） |
-| 5.1 编码 | core + tool（规划中）+ context-memory（规划中）+ safety（规划中，+ rag / ops） |
+| 5.1 编码 | core + tool + context-memory + safety（+ rag / ops） |
 | 6.1 规范核对 | check-agent-standards |
-| 7.1 评测与覆盖 | eval + ops（规划中，成本看数） |
+| 7.1 评测与覆盖 | eval + ops（成本看数） |
 
-> 标「规划中」的技能尚未发布，命中时不得跳过约束，按 check-agent-standards 的对应编号项代替（工具 5~8、上下文与记忆 11~15、检索 16~18、运维 22~24、安全 25~27）；完整口径见 skill/agent-dev-workflow/SKILL.md 的「规划中技能的过渡约定」。
+> 加载到技能后按各自的加载矩阵精确读子文件，禁止整目录读入。核对项（check-agent-standards 的 30 项）是交付前的机器兜底，不能代替规范口径。
 
 ### 5.2 命令（仅流程技能带 commands/）
 
@@ -341,21 +341,23 @@
 
 验收标准：拿一个真实小 agent 任务走一遍，能产出 1.1 / 2.1 / 3.1 / 6.1 / 7.1 五份产物，核对脚本能跑出报告。
 
-### 第二批（真实项目最先撞墙的三块，3 个）
+### 第二批（真实项目最先撞墙的三块，3 个）—— 已落地
 
 6. agent-tool-standards
 7. agent-context-memory-standards
 8. agent-safety-standards
 
 验收标准：工具 schema 与上下文预算表能在第一批流程的 3.2 与 5.1 中被真实引用。
+落地情况：三个技能各自 SKILL.md + 3 份 standards；3.2 与 5.1 的加载矩阵已改为必须加载。
 
-### 第三批（依赖具体栈与运行经验，3 个）
+### 第三批（依赖具体栈与运行经验，3 个）—— 2 个已提前落地
 
-9. agent-rag-standards
-10. agent-ops-standards
-11. agent-skill-authoring
+9. agent-rag-standards（已落地）
+10. agent-ops-standards（已落地）
+11. agent-skill-authoring（待定稿）
 
-验收标准：自家前 8 个技能通过一次体积审计与触发测试后，再据此定稿技能工程规范。
+验收标准：自家前 10 个技能通过一次体积审计与触发测试后，再据此定稿技能工程规范。
+落地情况：rag 与 ops 已落地（各 SKILL.md + 3 份 standards），agent-skill-authoring 仍待前 10 个技能真实运行一轮后定稿。
 
 ---
 
@@ -367,14 +369,18 @@ agent-forge/
 ├── .gitignore                     # 含 !**/SKILL.md 反忽略
 ├── .size-baseline.json            # 体积基线
 ├── scripts/                       # 体积审计等仓级脚本
-└── skill/                         # 当前已落地 5 个
+└── skill/                         # 当前已落地 10 个
     ├── agent-dev-workflow/        # SKILL.md + references/ + commands/ + templates/
     ├── agent-core-standards/      # SKILL.md + standards/
     ├── agent-eval-standards/      # SKILL.md + standards/
+    ├── agent-tool-standards/      # SKILL.md + standards/
+    ├── agent-context-memory-standards/  # SKILL.md + standards/
+    ├── agent-safety-standards/    # SKILL.md + standards/
+    ├── agent-ops-standards/       # SKILL.md + standards/
+    ├── agent-rag-standards/       # SKILL.md + standards/
     ├── check-agent-standards/     # SKILL.md + references/ + scripts/
     ├── agent-forge-source-law/    # SKILL.md
-    └── 规划中（尚无目录）：agent-tool-standards / agent-context-memory-standards /
-        agent-safety-standards / agent-rag-standards / agent-ops-standards / agent-skill-authoring
+    └── 规划中（尚无目录）：agent-skill-authoring
 ```
 
 命名规则：

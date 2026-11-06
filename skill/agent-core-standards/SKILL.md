@@ -48,8 +48,6 @@ description: "Agent 运行时骨架硬规范：主循环、状态机、终止条
 | token 计量、trace、成本上限埋点 | agent-ops-standards |
 | 注入防御、越权拦截 | agent-safety-standards |
 
-> 上表 5 个技能均属第二批（规划中，尚未发布）。落地前按 `check-agent-standards` 的对应编号项核对：工具 5~8、上下文与记忆 11~15、检索 16~18、运维 22~24、安全 25~27；细则见 agent-dev-workflow 的「规划中技能的过渡约定」。
-
 ## 交付前
 
 骨架相关代码写完，过 `check-agent-standards` 的「骨架」类核对项（步数上限、超时、终止分支、异常分类），每项附文件行号证据。

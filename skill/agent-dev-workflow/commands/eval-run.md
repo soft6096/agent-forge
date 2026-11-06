@@ -6,7 +6,7 @@ description: 评测执行与需求覆盖（第 7.1 步）。触发词：跑评�
 
 ## 做什么
 
-按 2.1 口径执行评测，产出 `7.1-评测报告与需求覆盖.md`，加载 `agent-eval-standards`；`agent-ops-standards` 规划中（第二批），成本与时延口径按 `check-agent-standards` 第 22~24 项。
+按 2.1 口径执行评测，产出 `7.1-评测报告与需求覆盖.md`，加载 `agent-eval-standards` + `agent-ops-standards`。
 
 ## 必含五段
 

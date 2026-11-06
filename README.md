@@ -4,7 +4,7 @@
 
 **English:** agent-forge is a family of Agent Skills for AI agent development. It sits between generic software methodology and framework tutorials: it does not teach you how to call an SDK, it constrains what you build into shapes that can be mechanically checked and statistically evaluated. The flagship skill `agent-dev-workflow` enforces one rule above all others — **define the evaluation before writing the code**.
 
-当前状态：**第一批（MVP）已落地**，5 个技能可直接安装使用；第二、三批在规划中，见下文技能表。
+当前状态：**10 个技能已落地**，可直接安装使用；仅 `agent-skill-authoring` 仍在规划（需前 10 个技能真实运行一轮后再定稿）。
 
 ---
 
@@ -31,15 +31,20 @@ agent-forge 就是把这四件事变成流程与规范。核心方法只有一�
 | [`check-agent-standards`](skill/check-agent-standards) | 核对 | 30 项核对（17 项机械判定 + 13 项人工判定）+ 扫描脚本，每项附「文件:行号」证据 |
 | [`agent-forge-source-law`](skill/agent-forge-source-law) | 元 | 来源铁律：区分开发源与安装产物，安装只认远端 |
 
-### 第二、三批（规划中）
+### 第二批（已落地，5 个）
+
+| 技能 | 类 | 职责 |
+|---|---|---|
+| [`agent-tool-standards`](skill/agent-tool-standards) | 规范 | 工具粒度与命名、schema 九字段、副作用分级、幂等与去重窗口、权限边界、错误语义、超时归属、MCP 接入、工具选择策略 |
+| [`agent-context-memory-standards`](skill/agent-context-memory-standards) | 规范 | 上下文预算表、组装顺序与不可变段、裁剪与滚动摘要、降级阶梯、三层记忆与写入判据、遗忘与污染防护 |
+| [`agent-safety-standards`](skill/agent-safety-standards) | 规范 | 提示词注入与内容隔离、越权防护、高危工具人在环、双向过滤与脱敏、审计留痕、人工接管 |
+| [`agent-ops-standards`](skill/agent-ops-standards) | 规范 | token 计量口径、成本核算与三层预算、缓存与模型分级、trace/span 与日志七字段、告警三档、降级与看板 |
+| [`agent-rag-standards`](skill/agent-rag-standards) | 规范 | 切分与索引更新、召回阈值与重排、查询改写与多路融合、引用强制、无命中拒答、权限过滤、离线召回评测 |
+
+### 规划中（1 个）
 
 | 技能 | 类 | 职责 | 批次 |
 |---|---|---|---|
-| `agent-tool-standards` | 规范 | 工具 schema、副作用分级、幂等、权限、错误语义、MCP 接入、工具选择策略 | 二 |
-| `agent-context-memory-standards` | 规范 | 上下文预算表、裁剪压缩、提示词组装、记忆写入判据与遗忘（与上下文同一张表） | 二 |
-| `agent-safety-standards` | 规范 | 提示词注入、越权、敏感信息、输出过滤、人在环、审计 | 二 |
-| `agent-rag-standards` | 规范 | 切分、召回、重排、引用、拒答、索引更新 | 三 |
-| `agent-ops-standards` | 规范 | token 计量、成本预算、trace、日志字段、告警、降级 | 三 |
 | `agent-skill-authoring` | 规范 | 技能工程：SKILL.md 写法、触发词、渐进披露、体积预算、分发与版本 | 三 |
 
 ## 三、流程一览
@@ -111,6 +116,11 @@ cd agent-forge
 |---|---|
 | 写 agent 主循环 / 修死循环 | "写个 agent 循环" / "agent 跑飞了"（加载 agent-core-standards） |
 | 定评测口径 / 建评测集 | "怎么验证这个 agent" / "做评测"（加载 agent-eval-standards） |
+| 加工具 / 接 MCP / 工具选不准 | "加个工具" / "接 MCP"（加载 agent-tool-standards） |
+| 上下文爆了 / 要加记忆 | "上下文超了" / "加记忆"（加载 agent-context-memory-standards） |
+| 防注入 / 高危操作确认 | "提示词注入" / "高危操作要人工确认"（加载 agent-safety-standards） |
+| 成本与监控 | "太贵了" / "加 trace"（加载 agent-ops-standards） |
+| 召回不准 / 引用出处 | "召回不准" / "做 RAG"（加载 agent-rag-standards） |
 | 交付前检查 | "对 src 跑 check-agent-standards" |
 | 技能没生效 | "技能不触发"（加载 agent-forge-source-law） |
 
@@ -124,11 +134,16 @@ agent-forge/
 ├── scripts/
 │   └── audit-size.py             # 技能体积审计（按实际加载路径统计）
 └── skill/
-    ├── agent-dev-workflow/       # SKILL.md + references/ + commands/ + templates/
-    ├── agent-core-standards/     # SKILL.md + standards/
-    ├── agent-eval-standards/     # SKILL.md + standards/
-    ├── check-agent-standards/    # SKILL.md + references/ + scripts/
-    └── agent-forge-source-law/   # SKILL.md
+    ├── agent-dev-workflow/              # SKILL.md + references/ + commands/ + templates/
+    ├── agent-core-standards/            # SKILL.md + standards/
+    ├── agent-eval-standards/            # SKILL.md + standards/
+    ├── agent-tool-standards/            # SKILL.md + standards/
+    ├── agent-context-memory-standards/  # SKILL.md + standards/
+    ├── agent-safety-standards/          # SKILL.md + standards/
+    ├── agent-ops-standards/             # SKILL.md + standards/
+    ├── agent-rag-standards/             # SKILL.md + standards/
+    ├── check-agent-standards/           # SKILL.md + references/ + scripts/
+    └── agent-forge-source-law/          # SKILL.md
 ```
 
 ## 七、与 jee-forge 的关系

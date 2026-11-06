@@ -63,35 +63,21 @@ description: "AI Agent 完整开发流程：新建 agent 项目、存量 agent �
 
 ## 加载矩阵（每步必须加载的规范技能）
 
-标「规划中」的技能属第二批、尚未发布，**不得因此跳过该步约束**，按下面的过渡约定执行。
-
 | 步骤 | 规范技能 |
 |---|---|
-| 0.0 | agent-core-standards + agent-ops-standards（规划中）+ agent-tool-standards（规划中，工具清单初稿） |
+| 0.0 | agent-core-standards + agent-ops-standards + agent-tool-standards（工具清单初稿） |
 | 0.5 | 按扫描结果按需 |
 | 1.1 | 无 |
-| 1.2 | agent-safety-standards（规划中）+ agent-core-standards |
+| 1.2 | agent-safety-standards + agent-core-standards |
 | 2.1 | agent-eval-standards |
-| 3.1 | agent-core-standards + agent-context-memory-standards（规划中）+ agent-tool-standards（规划中，+ rag / ops 若涉及，均规划中） |
-| 3.2 | agent-tool-standards（规划中） |
+| 3.1 | agent-core-standards + agent-context-memory-standards + agent-tool-standards（+ rag / ops 若涉及） |
+| 3.2 | agent-tool-standards |
 | 4.1 | agent-eval-standards |
-| 5.1 | agent-core-standards + agent-tool-standards（规划中）+ agent-context-memory-standards（规划中）+ agent-safety-standards（规划中，+ rag / ops） |
+| 5.1 | agent-core-standards + agent-tool-standards + agent-context-memory-standards + agent-safety-standards（+ rag / ops） |
 | 6.1 | check-agent-standards |
-| 7.1 | agent-eval-standards + agent-ops-standards（规划中） |
+| 7.1 | agent-eval-standards + agent-ops-standards |
 
-### 规划中技能的过渡约定（第二批发布前有效）
-
-命中规划中技能时，改为按 `check-agent-standards` 的对应编号项执行，并在产物里写一句「按核对项 N 代替（<技能名> 规划中）」，禁止直接跳过约束：
-
-| 规划中技能 | 代替口径 |
-|---|---|
-| agent-tool-standards | 核对项 5~8：工具描述与参数、副作用等级、幂等键、工具数量与选择策略 |
-| agent-context-memory-standards | 核对项 11~13（token 预算 / 裁剪压缩 / 输出预留）+ 14~15（记忆写入判据、敏感字段禁写） |
-| agent-safety-standards | 核对项 25~27：外部输入隔离、高危工具人工确认、输出过滤 |
-| agent-ops-standards | 核对项 22~24：日志字段、token 计量、成本上限 |
-| agent-rag-standards | 核对项 16~18：召回阈值、强制引用、未命中分支 |
-
-第二批技能发布后删除本节，恢复「必须加载」。核对项原文见 check-agent-standards 的 30 项表。
+加载到技能后按各自的加载矩阵**精确读子文件**，禁止整目录读入。`agent-skill-authoring` 仍在规划（第三批），写技能本身不在本流程内。
 
 ## 中间产物落盘规则
 

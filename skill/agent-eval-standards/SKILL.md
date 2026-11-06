@@ -39,9 +39,7 @@ agent 的输出是分布式的、非确定的：同一输入两次结果可能�
 | 骨架实现（循环、终止） | agent-core-standards |
 | 工具 schema 与错误语义 | agent-tool-standards |
 | 成本与 trace 埋点 | agent-ops-standards |
-| 注入与越权的对抗样本设计原则 | agent-safety-standards（规划中；样本落库与统计归本技能） |
-
-> 上表 tool / ops / safety 均属第二批（规划中，尚未发布）。落地前按 `check-agent-standards` 核对项 5~8（工具）、22~24（运维）、25~27（安全）执行。
+| 注入与越权的对抗样本设计原则 | agent-safety-standards（样本落库与统计归本技能） |
 
 ## 交付前
 

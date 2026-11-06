@@ -6,7 +6,7 @@ description: agent 架构方案（第 3.1 步）。触发词：agent 架构、�
 
 ## 做什么
 
-每个功能项一份 `3.1-<功能>-agent架构方案.md`，加载 `agent-core-standards`；`agent-context-memory-standards` / `agent-tool-standards` / `agent-rag-standards` 均规划中（第二批），按 `check-agent-standards` 第 11~15 / 5~8 / 16~18 项代替。六段必填：
+每个功能项一份 `3.1-<功能>-agent架构方案.md`，加载 `agent-core-standards` + `agent-context-memory-standards` + `agent-tool-standards`（涉及检索加 `agent-rag-standards`）。六段必填：
 
 1. 循环形态（单轮 / 工具循环 / 规划-执行 / 多 agent），含选择与放弃理由
 2. 状态机（阶段、流转、每阶段退出条件）

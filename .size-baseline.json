@@ -1,19 +1,39 @@
 {
+  "agent-context-memory-standards": {
+    "load_lines": 293,
+    "load_bytes": 14691
+  },
   "agent-core-standards": {
-    "load_lines": 303,
-    "load_bytes": 14062
+    "load_lines": 301,
+    "load_bytes": 13681
   },
   "agent-dev-workflow": {
-    "load_lines": 348,
-    "load_bytes": 18173
+    "load_lines": 334,
+    "load_bytes": 17045
   },
   "agent-eval-standards": {
-    "load_lines": 268,
-    "load_bytes": 12475
+    "load_lines": 266,
+    "load_bytes": 12273
   },
   "agent-forge-source-law": {
     "load_lines": 53,
     "load_bytes": 2876
+  },
+  "agent-ops-standards": {
+    "load_lines": 288,
+    "load_bytes": 14299
+  },
+  "agent-rag-standards": {
+    "load_lines": 296,
+    "load_bytes": 14680
+  },
+  "agent-safety-standards": {
+    "load_lines": 282,
+    "load_bytes": 15168
+  },
+  "agent-tool-standards": {
+    "load_lines": 295,
+    "load_bytes": 15376
   },
   "check-agent-standards": {
     "load_lines": 290,
