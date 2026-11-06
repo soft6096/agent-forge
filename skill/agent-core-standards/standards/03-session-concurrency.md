@@ -48,7 +48,7 @@ public class AgentService {
 
 会话状态是**事实**（做过什么、花了多少），上下文是**投影**（这一轮给模型看什么）。
 
-- 上下文由 `agent-context-memory-standards` 负责裁剪
+- 上下文由 `agent-context-memory-standards` 负责裁剪（该技能规划中，未发布前按 check 第 11~13 项：预算声明、裁剪压缩、输出预留）
 - 会话状态不允许被裁剪，只允许归档
 - 禁止把会话状态直接整段塞进提示词
 

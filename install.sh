@@ -78,11 +78,15 @@ detect_tools() {
       out+=("$t")
     fi
   done
-  [ ${#out[@]} -gt 0 ] && printf '%s\n' "${out[@]}"
+  # 有命中才输出；无命中时函数必须返回 0，否则调用处的赋值会被 set -e 提前终止
+  if [ ${#out[@]} -gt 0 ]; then
+    printf '%s\n' "${out[@]}"
+  fi
+  return 0
 }
 
 if [ ${#TOOLS[@]} -eq 0 ]; then
-  detected="$(detect_tools)"
+  detected="$(detect_tools || true)"
   [ -n "$detected" ] || die "未检测到任何 Agent 技能目录；用 --tool <agents|claude|codebuddy|trae|hermes|qoder> 显式指定"
   # 兼容 bash 3.2（macOS 自带）：不使用 mapfile
   while IFS= read -r t; do
@@ -105,13 +109,25 @@ fi
 # ---------- 1. 更新安装副本（始终来自远端） ----------
 if [ -d "$REPO_DIR/.git" ]; then
   log "更新安装副本..."
-  git -C "$REPO_DIR" fetch --quiet origin "$REF" || die "fetch 失败：$REMOTE ($REF)"
-  git -C "$REPO_DIR" checkout --quiet FETCH_HEAD || die "checkout 失败"
+  # --ref 允许分支 / 标签 / 提交号：先按 refspec 拉，失败退回拉全部分支
+  git -C "$REPO_DIR" fetch --quiet origin "$REF" \
+    || git -C "$REPO_DIR" fetch --quiet origin \
+    || die "fetch 失败：$REMOTE ($REF)"
+  git -C "$REPO_DIR" checkout --quiet FETCH_HEAD || die "checkout 失败（ref：${REF}）"
 else
+  # 目录存在但不是 git 仓库时不再静默清理（下面有 rm -rf），避免误删用户内容
+  if [ -e "$REPO_DIR" ] && [ -n "$(ls -A "$REPO_DIR" 2>/dev/null)" ]; then
+    die "安装副本路径已存在且不是 git 仓库：${REPO_DIR}（请手动清理，或设 AGENT_FORGE_REPO_DIR 换路径）"
+  fi
   log "拉取安装副本..."
   mkdir -p "$(dirname "$REPO_DIR")"
-  git clone --quiet --depth 1 --branch "$REF" "$REMOTE" "$REPO_DIR" \
-    || die "clone 失败：$REMOTE ($REF)"
+  # 分支 / 标签可浅克隆；提交号不支持 --branch，退回全量克隆再 checkout
+  if ! git clone --quiet --depth 1 --branch "$REF" "$REMOTE" "$REPO_DIR" 2>/dev/null; then
+    rm -rf "$REPO_DIR"
+    git clone --quiet "$REMOTE" "$REPO_DIR" || die "clone 失败：$REMOTE"
+    git -C "$REPO_DIR" checkout --quiet "$REF" \
+      || die "checkout 失败：$REF 不是 $REMOTE 的分支、标签或提交"
+  fi
 fi
 
 COMMIT="$(git -C "$REPO_DIR" rev-parse --short HEAD)"
@@ -133,6 +149,7 @@ EOF
 # ---------- 2. 分发技能 ----------
 STAMP="$(date '+%Y%m%d%H%M%S')"
 installed=0
+skipped=0
 
 for t in "${TOOLS[@]}"; do
   dest="$(tool_dir "$t")"
@@ -144,17 +161,28 @@ for t in "${TOOLS[@]}"; do
     if [ "$MODE" = "link" ]; then
       if [ -e "$target" ] || [ -L "$target" ]; then
         if [ "$FORCE" -eq 1 ]; then
-          rm -rf "$target"
+          # 软链只删链接本身；实体目录先备份，避免 rm -rf 抹掉用户内容
+          if [ -L "$target" ]; then
+            rm -f "$target"
+          else
+            mv "$target" "$target.pre-agent-forge-$STAMP"
+          fi
         else
-          warn "已存在，跳过：$target（--force 覆盖）"
+          warn "已存在，跳过（未更新）：${target}（要覆盖请加 --force）"
+          skipped=$((skipped + 1))
           continue
         fi
       fi
-      ln -s "$src" "$target"
+      ln -s "${src%/}" "$target"
     else
       if [ -e "$target" ] || [ -L "$target" ]; then
-        [ "$FORCE" -eq 1 ] || { warn "已存在，跳过：$target（--force 覆盖）"; continue; }
-        mv "$target" "$target.pre-agent-forge-$STAMP"
+        if [ "$FORCE" -eq 1 ]; then
+          mv "$target" "$target.pre-agent-forge-$STAMP"
+        else
+          warn "已存在，跳过（未更新）：${target}（要覆盖请加 --force）"
+          skipped=$((skipped + 1))
+          continue
+        fi
       fi
       cp -R "$src" "$target"
     fi
@@ -164,6 +192,9 @@ for t in "${TOOLS[@]}"; do
 done
 
 log "技能实例：$installed 个"
+if [ "$skipped" -gt 0 ]; then
+  warn "有 $skipped 个技能因已存在被跳过，版本未更新；确认要覆盖请重跑并加 --force"
+fi
 
 # ---------- 3. 分发全局规则（受管块，幂等） ----------
 if [ "$WITH_GLOBAL_RULES" -eq 1 ] && [ -f "$REPO_DIR/global-rules.md" ]; then
@@ -179,10 +210,16 @@ if [ "$WITH_GLOBAL_RULES" -eq 1 ] && [ -f "$REPO_DIR/global-rules.md" ]; then
   else
     for f in "${targets[@]}"; do
       tmp="$(mktemp)"
+      # 先删掉旧受管块，再去掉文件尾部空行，保证重跑幂等（不会每次多一个空行）
       awk -v b="$BEGIN_MARK" -v e="$END_MARK" '
         $0 == b { skip=1; next }
         $0 == e { skip=0; next }
-        !skip   { print }
+        skip    { next }
+        { lines[++n] = $0 }
+        END {
+          while (n > 0 && lines[n] == "") n--
+          for (i = 1; i <= n; i++) print lines[i]
+        }
       ' "$f" > "$tmp"
       {
         printf '\n%s\n' "$BEGIN_MARK"

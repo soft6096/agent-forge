@@ -9,24 +9,31 @@ description: "Agent 代码交付前的规范兜底核对（收敛闸门）。**�
 
 agent 代码的收敛闸门。规范分散在多个技能（骨架、工具、上下文、安全、评测），编码时容易漏；本技能在交付前统一扫一遍，只做**可判定**的项，语义项明确交人工。
 
-## 执行方式（脚本优先）
+## 执行方式（脚本优先，用绝对路径）
+
+脚本随技能安装，**不在被检查的项目里**；在被检项目目录下用 `scripts/...` 相对路径一定找不到文件。先取技能目录：
 
 ```bash
-# 默认：只扫 git 改动的文件（刚写完代码的兜底自检主场景）
-python3 scripts/check_agent_standards.py --project <项目根>
+# link / copy 形态都适用；装到其它工具时把 ~/.agents/skills 换成对应工具的技能目录
+SKILL_DIR="${CHECK_AGENT_SKILL_DIR:-$HOME/.agents/skills/check-agent-standards}"
 
-# 全项目扫描（全量体检）
-python3 scripts/check_agent_standards.py --project <项目根> --all
+# 全项目扫描（**默认行为**，新项目首次体检用）
+python3 "$SKILL_DIR/scripts/check_agent_standards.py" --project <项目根>
+
+# 只扫本次 git 改动文件（刚写完代码的兜底自检主场景，快；必须显式加 --changed）
+python3 "$SKILL_DIR/scripts/check_agent_standards.py" --project <项目根> --changed
 
 # 只扫指定目录
-python3 scripts/check_agent_standards.py --project <项目根> --path src/agent
+python3 "$SKILL_DIR/scripts/check_agent_standards.py" --project <项目根> --path src/agent
 
 # 机读 JSON（推荐，省上下文）
-python3 scripts/check_agent_standards.py --project <项目根> --format json --output .ca-report.json
+python3 "$SKILL_DIR/scripts/check_agent_standards.py" --project <项目根> --format json --output .ca-report.json
 
 # 只跑部分项
-python3 scripts/check_agent_standards.py --project <项目根> --only 1,2,9,22
+python3 "$SKILL_DIR/scripts/check_agent_standards.py" --project <项目根> --only 1,2,9,22
 ```
+
+注意：不带 `--changed` 时脚本扫全项目，新项目会一次报出大量 fail，属正常；要"只看本次改动"必须显式加 `--changed`。`--output` 写到当前工作目录，别写进被检项目根污染仓库。
 
 无 Python 环境时，按 `references/checklist.md` 的 grep 指令手工执行（降级路径，结论等价）。
 

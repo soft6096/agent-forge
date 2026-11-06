@@ -25,10 +25,10 @@ agent-forge 就是把这四件事变成流程与规范。核心方法只有一�
 
 | 技能 | 类 | 职责 |
 |---|---|---|
-| [`agent-dev-workflow`](skill/agent-dev-workflow) | 流程 | 0.0~7.1 十一步完整链路，11 个命令、13 份产物模板、每步人工闸门 |
+| [`agent-dev-workflow`](skill/agent-dev-workflow) | 流程 | 0.0~7.1 十一步完整链路，13 个命令、11 份产物模板（另 2 份通用规范）、每步人工闸门 |
 | [`agent-core-standards`](skill/agent-core-standards) | 规范 | 骨架：主循环、状态机、五类终止条件、失败分类、重试与熔断、幂等、死循环识别、会话与并发 |
 | [`agent-eval-standards`](skill/agent-eval-standards) | 规范 | 评测：四层数据集、六项指标、判定方式与模型裁判的六个坑、回归基线、三层门禁、失败归因 |
-| [`check-agent-standards`](skill/check-agent-standards) | 核对 | 30 项机械核对 + 扫描脚本，每项附「文件:行号」证据；语义项标 manual 交人工 |
+| [`check-agent-standards`](skill/check-agent-standards) | 核对 | 30 项核对（18 项机械判定 + 12 项人工判定）+ 扫描脚本，每项附「文件:行号」证据 |
 | [`agent-forge-source-law`](skill/agent-forge-source-law) | 元 | 来源铁律：区分开发源与安装产物，安装只认远端 |
 
 ### 第二、三批（规划中）
@@ -90,8 +90,10 @@ cd agent-forge
 | `--link` | 链接形态，安装副本在 `~/.agents/repos/agent-forge` |
 | `--tool claude` | 只装到指定工具，可重复 |
 | `--ref <ref>` | 指定分支 / 标签 / 提交 |
-| `--force` | 覆盖已存在副本（先备份） |
+| `--force` | 覆盖已存在的技能（拷贝形态先备份为 `<技能名>.pre-agent-forge-<时间戳>`，链接形态只重建软链） |
 | `--no-global-rules` | 不分发全局规则受管块 |
+
+已有技能目录时默认**不覆盖**，安装日志会打印「跳过（未更新）」，末尾再汇总一次跳过数量。升级到新版必须显式加 `--force`，否则装到的还是旧版。
 
 安装完成后新开会话，说：
 
@@ -116,7 +118,8 @@ cd agent-forge
 
 ```
 agent-forge/
-├── README.md / global-rules.md / install.sh
+├── README.md / SKILL-MAP.md / global-rules.md / install.sh
+├── .gitignore                    # 含 !**/SKILL.md 反忽略
 ├── .size-baseline.json           # 体积基线，改技能后跑审计对比
 ├── scripts/
 │   └── audit-size.py             # 技能体积审计（按实际加载路径统计）

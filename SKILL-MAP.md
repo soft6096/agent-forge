@@ -1,6 +1,6 @@
 # agent-forge 技能地图（SKILL-MAP）
 
-> 状态：规划稿 v0.1，尚未创建任何技能目录。
+> 状态：第一批 5 个技能已落地并安装（agent-dev-workflow / agent-core-standards / agent-eval-standards / check-agent-standards / agent-forge-source-law）；第二、三批 6 个仍在规划，尚未创建目录。
 > 本文是后续所有实现的基准，技能清单、职责边界、产物编号、分批计划以本文为准；改动先改本文再改代码。
 
 ---
@@ -92,6 +92,8 @@
 | 9 | agent-skill-authoring | 规范 | 技能工程：写法、触发词、渐进披露、体积、分发 | 技能目录、审计脚本 |
 | 10 | check-agent-standards | 核对 | 可机械判定的规范兜底扫描 + 证据报告 | 核对报告（JSON/MD） |
 | 11 | agent-forge-source-law | 元 | 区分开发源与安装产物，禁止拿源目录当安装源 | 安装回执 |
+
+> 落地状态：# 1、2、6、10、11 已发布（第一批）；# 3、4、5、7、8、9 为规划中，无对应目录。
 
 ---
 
@@ -238,17 +240,19 @@
 
 | 步骤 | 必须加载 |
 |---|---|
-| 0.0 agent 项目初始化 | core + ops（骨架与埋点）+ tool（工具清单初稿） |
+| 0.0 agent 项目初始化 | core + ops（规划中，骨架与埋点）+ tool（规划中，工具清单初稿） |
 | 0.5 存量 agent 扫描 | 无强制，按扫描结果按需加载 |
 | 1.1 能力清单 | 无 |
-| 1.2 失败模式 | safety + core |
+| 1.2 失败模式 | safety（规划中）+ core |
 | 2.1 评测口径 | eval |
-| 3.1 架构方案 | core + context-memory + tool（+ rag / ops 若涉及） |
-| 3.2 工具契约 | tool |
+| 3.1 架构方案 | core + context-memory（规划中）+ tool（规划中，+ rag / ops 若涉及，均规划中） |
+| 3.2 工具契约 | tool（规划中） |
 | 4.1 任务拆解 | eval（评测集建设单列 Phase） |
-| 5.1 编码 | core + tool + context-memory + safety（+ rag / ops） |
+| 5.1 编码 | core + tool（规划中）+ context-memory（规划中）+ safety（规划中，+ rag / ops） |
 | 6.1 规范核对 | check-agent-standards |
-| 7.1 评测与覆盖 | eval + ops（成本看数） |
+| 7.1 评测与覆盖 | eval + ops（规划中，成本看数） |
+
+> 标「规划中」的技能尚未发布，命中时不得跳过约束，按 check-agent-standards 的对应编号项代替（工具 5~8、上下文与记忆 11~15、检索 16~18、运维 22~24、安全 25~27）；完整口径见 skill/agent-dev-workflow/SKILL.md 的「规划中技能的过渡约定」。
 
 ### 5.2 命令（仅流程技能带 commands/）
 
@@ -359,21 +363,18 @@
 
 ```
 agent-forge/
-├── README.md / COPYRIGHT.md / LICENSE / install.sh / global-rules.md
-├── docs/                          # 使用指南、维护清单、经验回流
+├── README.md / SKILL-MAP.md / global-rules.md / install.sh
+├── .gitignore                     # 含 !**/SKILL.md 反忽略
+├── .size-baseline.json            # 体积基线
 ├── scripts/                       # 体积审计等仓级脚本
-└── skill/
-    ├── agent-dev-workflow/        # SKILL.md + references/ + commands/ + templates/ + docs/
-    ├── agent-core-standards/      # SKILL.md + standards/ + references/
-    ├── agent-tool-standards/
-    ├── agent-context-memory-standards/
-    ├── agent-rag-standards/
-    ├── agent-eval-standards/
-    ├── agent-ops-standards/
-    ├── agent-safety-standards/
-    ├── agent-skill-authoring/
+└── skill/                         # 当前已落地 5 个
+    ├── agent-dev-workflow/        # SKILL.md + references/ + commands/ + templates/
+    ├── agent-core-standards/      # SKILL.md + standards/
+    ├── agent-eval-standards/      # SKILL.md + standards/
     ├── check-agent-standards/     # SKILL.md + references/ + scripts/
-    └── agent-forge-source-law/
+    ├── agent-forge-source-law/    # SKILL.md
+    └── 规划中（尚无目录）：agent-tool-standards / agent-context-memory-standards /
+        agent-safety-standards / agent-rag-standards / agent-ops-standards / agent-skill-authoring
 ```
 
 命名规则：

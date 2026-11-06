@@ -11,7 +11,9 @@ description: 规范核对（第 6.1 步，强制独立节点）。触发词：�
 ## 执行规则
 
 1. **编码的 agent 不自评**：本步由独立步骤执行，写码方只能提供改动范围
-2. 脚本优先：`python3 scripts/check_agent_standards.py --project <根> --changed`（无 Python 回退 grep 手工）
+2. 脚本优先，用技能目录的绝对路径（脚本不在被检项目里，相对路径必失败）：
+   `python3 ~/.agents/skills/check-agent-standards/scripts/check_agent_standards.py --project <根> --changed`
+   装到其它工具时把 `~/.agents/skills` 换成该工具的技能目录；无 Python 回退 grep 手工
 3. 每项结论必须附「文件:行号」证据，禁止"已符合"无证据
 4. 未通过项列待确认清单，与用户确认后补齐，不自行删项
 5. 不允许把"不影响功能"作为跳过理由
