@@ -4,7 +4,7 @@
 #   ./install.sh                 拷贝形态（默认，兼容性最好）
 #   ./install.sh --link          链接形态（一份副本 + 软链，多 Agent 混用推荐）
 #   ./install.sh --list          只预览，不安装
-#   ./install.sh --ref v0.1.0    指定分支 / 标签 / 提交
+#   ./install.sh --ref v0.1.0    指定分支 / 标签
 #   ./install.sh --repo github   指定远端别名（gitee / github）或完整 git 地址
 #   ./install.sh --tool claude   只装到指定工具（可重复）
 #   ./install.sh --force         覆盖已存在副本（先备份）
@@ -82,8 +82,12 @@ detect_tools() {
 }
 
 if [ ${#TOOLS[@]} -eq 0 ]; then
-  mapfile -t TOOLS < <(detect_tools)
-  [ ${#TOOLS[@]} -gt 0 ] || die "未检测到任何 Agent 技能目录；用 --tool <agents|claude|codebuddy|trae|hermes|qoder> 显式指定"
+  detected="$(detect_tools)"
+  [ -n "$detected" ] || die "未检测到任何 Agent 技能目录；用 --tool <agents|claude|codebuddy|trae|hermes|qoder> 显式指定"
+  # 兼容 bash 3.2（macOS 自带）：不使用 mapfile
+  while IFS= read -r t; do
+    [ -n "$t" ] && TOOLS+=("$t")
+  done <<< "$detected"
 fi
 
 log "来源：$REMOTE"
@@ -138,7 +142,14 @@ for t in "${TOOLS[@]}"; do
     name="$(basename "$src")"
     target="$dest/$name"
     if [ "$MODE" = "link" ]; then
-      [ -L "$target" ] || [ -e "$target" ] && { [ "$FORCE" -eq 1 ] || { warn "已存在，跳过：$target（--force 覆盖）"; continue; }; rm -rf "$target"; }
+      if [ -e "$target" ] || [ -L "$target" ]; then
+        if [ "$FORCE" -eq 1 ]; then
+          rm -rf "$target"
+        else
+          warn "已存在，跳过：$target（--force 覆盖）"
+          continue
+        fi
+      fi
       ln -s "$src" "$target"
     else
       if [ -e "$target" ] || [ -L "$target" ]; then
