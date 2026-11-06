@@ -243,6 +243,10 @@ def check_skills(root: Path):
                 desc = desc_m.group(1)
                 if len(desc) < 40:
                     desc_bad.append("%s  description 过短，无法区分触发场景" % rel(root, skill_md))
+                # 客户端对 description 普遍有 1024 字符上限，超了技能直接不被加载
+                elif len(desc) > 1024:
+                    size_bad.append("%s  description %d 字符，超客户端上限 1024"
+                                    % (rel(root, skill_md), len(desc)))
         line_count = len(lines)
         byte_size = len(text.encode("utf-8"))
         if line_count > 300 or byte_size > 24576:
