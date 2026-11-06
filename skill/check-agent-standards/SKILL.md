@@ -1,6 +1,6 @@
 ---
 name: check-agent-standards
-description: "Agent 代码交付前的规范兜底核对（收敛闸门）。**任何 agent 相关代码写完或改完后必须加载本 skill——包括不走完整流程的零散写码**：骨架（步数上限/超时/终止条件/异常分类）、工具（描述/参数/副作用等级/幂等）、提示词外置与版本、上下文预算与裁剪、记忆写入判据、检索阈值与引用、评测集与门禁、日志字段与 token 计量、成本上限、高危确认与输出过滤、技能 frontmatter 与体积预算。优先跑仓内脚本 scripts/check_agent_standards.py（纯标准库、本地零 token），无 Python 环境回退 grep 手工执行，每项附「文件:行号」证据。触发：检查 agent 规范、兜底核对、写完 agent 代码检查、agent code review、规范自检、交付前检查、对某目录跑 check-agent-standards。**禁止凭记忆答通过**；语义项一律标 manual 交人工判定。"
+description: "Agent 代码交付前的规范兜底核对（收敛闸门）。**仅适用于 agent 相关代码与项目**——普通业务代码排错、非 agent 工程（纯后端 CRUD、前端页面）不适用，别加载本技能。任何 agent 相关代码写完或改完后必须加载本 skill，包括不走完整流程的零散写码：骨架（步数上限/超时/终止条件/异常分类）、工具（描述/参数/副作用等级/幂等）、提示词外置与版本、上下文预算与裁剪、记忆写入判据、检索阈值与引用、评测集与门禁、日志字段与 token 计量、成本上限、高危确认与输出过滤、技能 frontmatter 与体积预算。优先跑技能目录内的脚本 scripts/check_agent_standards.py（纯标准库、本地零 token，用绝对路径），无 Python 环境回退 grep 手工执行，每项附「文件:行号」证据。触发：检查 agent 规范、兜底核对、写完 agent 代码检查、agent code review、规范自检、交付前检查、对某目录跑 check-agent-standards。**禁止凭记忆答通过**；语义项一律标 manual 交人工判定。"
 ---
 
 # Agent 规范兜底核对
