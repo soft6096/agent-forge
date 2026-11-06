@@ -126,7 +126,8 @@
 ### 17. 强制输出引用
 
 - 判定：回答需带出处，检索结果带 source 字段
-- 自动模式：`citation|source_id|provenance|references`
+- **manual**：命中 citation / source_id / provenance 只能当线索——"是否**强制**模型给出处"属语义判定，关键词出现不等于生效
+- 手工：`grep -rnE "citation|source_id|provenance" .` 后人工确认回答模板与提示词里是否要求出处、缺失时是否降级
 
 ### 18. 未命中分支
 

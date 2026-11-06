@@ -8,7 +8,9 @@
   1. SKILL.md        常驻成本（技能被触发时一定加载）
   2. references/     按需成本（同一任务通常会读其中一份，最坏情况全读）
   3. 其它（templates/ commands/ docs/ scripts/）
-                     随件，独立产物，不随任务加载；只限文件数，不限行数
+                    随件，独立产物，不随任务加载；只限文件数，不限行数
+                    脚本（.py/.sh）与配置同样计入文件数，避免"代码藏在 scripts/ 不计预算"
+
 
 预算：SKILL.md ≤ 300 行且 ≤ 24KB；SKILL.md + references ≤ 900 行且 ≤ 72KB；随件 ≤ 40 个文件。
 退出码：0 通过 / 1 超预算或增量超阈值 / 2 环境错误。
@@ -33,6 +35,8 @@ FAIL_RATIO = 1.20
 BASELINE_NAME = ".size-baseline.json"
 # 这些目录是"随件"：独立产物，不随任务一次性加载
 ASSET_DIRS = {"templates", "commands", "docs", "scripts", "assets"}
+# 按文本统计的后缀：技能目录里的脚本与配置也要计入随件文件数
+TEXT_SUFFIXES = {".md", ".py", ".sh", ".json", ".yml", ".yaml", ".txt"}
 
 
 def text_stats(p: Path):
@@ -55,8 +59,10 @@ def audit_skill(skill_dir: Path):
     load_lines, load_bytes = s_lines, s_bytes
     asset_lines = asset_bytes = asset_files = 0
 
-    for p in skill_dir.rglob("*.md"):
-        if p == skill_md:
+    for p in sorted(skill_dir.rglob("*")):
+        if not p.is_file() or p == skill_md:
+            continue
+        if "__pycache__" in p.parts or p.suffix.lower() not in TEXT_SUFFIXES:
             continue
         lines, size = text_stats(p)
         if ASSET_DIRS & set(p.parts):

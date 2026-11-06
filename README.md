@@ -28,7 +28,7 @@ agent-forge 就是把这四件事变成流程与规范。核心方法只有一�
 | [`agent-dev-workflow`](skill/agent-dev-workflow) | 流程 | 0.0~7.1 十一步完整链路，13 个命令、11 份产物模板（另 2 份通用规范）、每步人工闸门 |
 | [`agent-core-standards`](skill/agent-core-standards) | 规范 | 骨架：主循环、状态机、五类终止条件、失败分类、重试与熔断、幂等、死循环识别、会话与并发 |
 | [`agent-eval-standards`](skill/agent-eval-standards) | 规范 | 评测：四层数据集、六项指标、判定方式与模型裁判的六个坑、回归基线、三层门禁、失败归因 |
-| [`check-agent-standards`](skill/check-agent-standards) | 核对 | 30 项核对（18 项机械判定 + 12 项人工判定）+ 扫描脚本，每项附「文件:行号」证据 |
+| [`check-agent-standards`](skill/check-agent-standards) | 核对 | 30 项核对（17 项机械判定 + 13 项人工判定）+ 扫描脚本，每项附「文件:行号」证据 |
 | [`agent-forge-source-law`](skill/agent-forge-source-law) | 元 | 来源铁律：区分开发源与安装产物，安装只认远端 |
 
 ### 第二、三批（规划中）

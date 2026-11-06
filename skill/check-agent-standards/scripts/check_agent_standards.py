@@ -38,20 +38,20 @@ ITEMS = [
     (2, "骨架", "单步超时可配置", r"timeout|time_limit|deadline", "auto"),
     (3, "骨架", "终止条件分支齐全", r"finish_reason|stop_reason|terminat|final_answer|completed", "auto"),
     (4, "骨架", "异常分类处理", r"class\s+\w+(Error|Exception)|retryable|is_retryable", "manual"),
-    (5, "工具", "工具带描述与参数结构", r"description|inputSchema|args_schema|parameters", "manual"),
+    (5, "工具", "工具带描述与参数结构", r"description&&inputSchema|input_schema|args_schema|parameters|properties", "manual"),
     (6, "工具", "副作用等级已标注", r"read_only|readOnly|destructive|risk_level|side_effect", "manual"),
     (7, "工具", "写类工具有幂等键", r"idempotenc|dedup|dedupe", "auto"),
     (8, "工具", "工具数量与选择策略", r"tool_selector|select_tools|tool_group|tool_routing", "manual"),
     (10, "提示词", "提示词带版本标识", r"prompt_version|PROMPT_VERSION|version\s*[:=]", "manual"),
     (11, "上下文", "声明 token 预算", r"max_tokens|maxTokens|token_budget|context_window|budget_tokens", "auto"),
-    (12, "上下文", "有裁剪或压缩实现", r"truncate|summar|compress|prune|trim_history|window", "auto"),
+    (12, "上下文", "有裁剪或压缩实现", r"truncate|summar|compress|prune|trim_history|sliding_window|context_window", "auto"),
     (13, "上下文", "有输出预留", r"max_output_tokens|output_tokens|response_tokens|reserve", "manual"),
     (14, "记忆", "记忆写入有判据", r"should_remember|memory_write|worth_remember|extract_memor", "manual"),
     (15, "记忆", "敏感字段禁写", r"sensitive|redact|mask|pii|sanitize", "manual"),
     (16, "检索", "召回上限与阈值", r"top_k|topK|similarity_threshold|score_threshold|min_score", "auto"),
-    (17, "检索", "强制输出引用", r"citation|source_id|provenance|references", "manual"),
+    (17, "检索", "强制输出引用", r"citation|source_id|provenance", "manual_only"),
     (18, "检索", "未命中分支", r"no_result|not_found|empty_result|no_hit|no_context", "manual"),
-    (20, "评测", "门禁阈值配置", r"pass_rate|min_score|threshold|gate|budget_usd|max_cost", "auto"),
+    (20, "评测", "门禁阈值配置", r"pass_rate|min_score|threshold\s*[:=]|budget_usd|max_cost", "auto"),
     (22, "运维", "日志含会话 id 与 trace id", r"session_id|trace_id|correlation_id", "auto"),
     (23, "运维", "记录 token 用量", r"prompt_tokens|completion_tokens|total_tokens|\busage\b", "auto"),
     (24, "运维", "成本上限", r"cost_limit|max_cost|budget_usd|cost_cap", "auto"),
@@ -99,20 +99,58 @@ def read_text(p: Path) -> str:
         return ""
 
 
+COMMENT_MARKS = ("#", "//", "/*", "*", "<!--", "--")
+
+
+def strip_comment(line: str) -> str:
+    """去掉整行注释与行尾注释。
+
+    为什么：关键词出现在注释或文档字符串里不代表有实现。不剥离会让"注释里写了 trace_id"
+    被判成 pass，比 fail 更危险——它让人相信已经合规。
+    """
+    s = line.strip()
+    if not s or s.startswith(COMMENT_MARKS):
+        return ""
+    body = line
+    for mark in (" #", "\t#", " //"):
+        idx = body.find(mark)
+        if idx > 0:
+            body = body[:idx]
+    return body.strip()
+
+
 def search(files, root: Path, pattern: str, limit: int = 3):
-    """逐文件逐行匹配，每个文件只取首个命中，最多 limit 条证据。"""
+    """逐文件匹配，每个文件只取首个命中，最多 limit 条证据。
+
+    pattern 含 && 时按"同一文件内所有子模式都命中"判定（用于两段式判据，
+    避免单个宽泛词就命中，例如工具描述必须同时有 description 与参数结构）。
+    注释行一律不参与匹配。
+    """
+    parts = [x.strip() for x in pattern.split("&&") if x.strip()]
     try:
-        rx = re.compile(pattern, re.IGNORECASE)
+        rxs = [re.compile(x, re.IGNORECASE) for x in parts]
     except re.error:
         return []
     hits = []
     for p in files:
-        for lineno, line in enumerate(read_text(p).splitlines(), 1):
-            if rx.search(line):
-                hits.append("%s:%d  %s" % (rel(root, p), lineno, line.strip()[:120]))
+        lines = read_text(p).splitlines()
+        first = None
+        for rx in rxs:
+            found = None
+            for lineno, line in enumerate(lines, 1):
+                body = strip_comment(line)
+                if body and rx.search(body):
+                    found = (lineno, body)
+                    break
+            if found is None:
+                first = None
                 break
-        if len(hits) >= limit:
-            break
+            if first is None:
+                first = found
+        if first:
+            hits.append("%s:%d  %s" % (rel(root, p), first[0], first[1][:120]))
+            if len(hits) >= limit:
+                break
     return hits
 
 
@@ -130,7 +168,8 @@ def check_prompts_external(files, root: Path):
     d = find_dir(root, PROMPT_DIR_NAMES)
     if d is not None:
         return "pass", ["提示词目录：%s" % rel(root, d)], ""
-    hits = search(files, root, r"read_text\(|open\([^)]*prompt|load_prompt|get_prompt", 2)
+    # 要求同一文件里既出现 prompt 语义、又出现读取动作，避免任意 read_text 就被判外置
+    hits = search(files, root, r"prompt&&read_text\(|open\(|load_prompt|get_prompt", 2)
     if hits:
         return "pass", hits, ""
     # 反向证据：代码里出现超长字符串字面量作为提示词
@@ -139,7 +178,8 @@ def check_prompts_external(files, root: Path):
     for p in files:
         text = read_text(p)
         for lineno, line in enumerate(text.splitlines(), 1):
-            if rx.search(line) and (len(line) > 200 or '"""' in line or "'''" in line):
+            body = strip_comment(line)
+            if body and rx.search(body) and (len(body) > 200 or '"""' in body or "'''" in body):
                 long_hits.append("%s:%d  疑似硬编码提示词" % (rel(root, p), lineno))
                 break
         if len(long_hits) >= 2:
@@ -223,14 +263,19 @@ def build_report(root: Path, files, only=None):
         if only and item_id not in only:
             continue
         hits = search(files, root, pattern)
-        if hits:
+        if mode == "manual_only":
+            # 命中的关键词只能当线索：这类项本质是语义判定，不能自动判 pass
+            status = "manual"
+            hint = "命中关键词仅供参考，需人工确认是否真的强制生效"
+        elif hits:
             status = "pass"
+            hint = ""
         else:
             status = "fail" if mode == "auto" else "manual"
+            hint = "未发现相关配置或实现" if mode == "auto" else "需人工判定"
         items.append({
             "id": item_id, "group": group, "name": name,
-            "status": status, "evidence": hits or [],
-            "hint": "" if hits else ("未发现相关配置或实现" if mode == "auto" else "需人工判定"),
+            "status": status, "evidence": hits or [], "hint": hint,
         })
 
     if not only or 9 in only:
