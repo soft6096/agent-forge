@@ -1,0 +1,22 @@
+{
+  "agent-core-standards": {
+    "load_lines": 301,
+    "load_bytes": 13591
+  },
+  "agent-dev-workflow": {
+    "load_lines": 310,
+    "load_bytes": 15159
+  },
+  "agent-eval-standards": {
+    "load_lines": 266,
+    "load_bytes": 12273
+  },
+  "agent-forge-source-law": {
+    "load_lines": 53,
+    "load_bytes": 2876
+  },
+  "check-agent-standards": {
+    "load_lines": 282,
+    "load_bytes": 10351
+  }
+}
