@@ -1,0 +1,14 @@
+{
+  "id": "01-expect-mismatch",
+  "input": "VIN 为 LSVAA1234R1234567，变速箱异响是否在保",
+  "expect": {
+    "reason": "budget_exceeded",
+    "max_steps": 1,
+    "tools_used": ["search_clause"],
+    "answer_contains": ["这段片段不可能出现"],
+    "answer_not_contains": ["在保"],
+    "detail_contains": ["预算耗尽"],
+    "tool_error_codes": ["not_found"]
+  },
+  "note": "负样本：判定项逐条写错，用于验证失败归因能一项不落地指出差在哪（这条跑红是预期结果）"
+}

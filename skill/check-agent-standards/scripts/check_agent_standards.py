@@ -238,6 +238,40 @@ def check_eval_dataset(root: Path):
     return "fail", [], "未找到评测集，建立 evals/ 目录并放入样本文件"
 
 
+def check_eval_report(root: Path):
+    """第 21 项：评测报告含失败样本。
+
+    判据不是"有没有写失败样本四个字"——那样一份只写了通过率的报告、甚至 README
+    里的一句说明都能骗过。要证明归因链路可用，报告里必须出现结构化明细：
+    至少 2 行「未命中:」（逐项列出差在哪）与 1 行「实际答复:」（真实输出）。
+
+    :param root: 项目根
+    :return: （状态, 证据, 建议）
+    """
+    for p in sorted(root.rglob("*")):
+        if not p.is_file() or p.suffix.lower() not in {".md", ".txt", ".log"}:
+            continue
+        if in_skipped_dir(root, p):
+            continue
+
+        # 1. 逐行数结构化明细：前缀固定，README 之类的自然语言不会误命中
+        text = read_text(p)
+        missing = 0
+        has_answer = False
+        for line in text.splitlines():
+            body = line.strip()
+            if body.startswith("未命中:") or body.startswith("未命中："):
+                missing += 1
+            elif body.startswith("实际答复:") or body.startswith("实际答复："):
+                has_answer = True
+
+        # 2. 两项都满足才算报告真的带了失败样本与归因
+        if missing >= 2 and has_answer:
+            return "pass", ["%s（%d 条未命中明细 + 实际答复）" % (rel(root, p), missing)], ""
+
+    return "manual", [], "人工检查最近一次评测报告是否含失败样本的真实输入输出与归因"
+
+
 def check_skills(root: Path):
     """第 28~30 项：技能目录合规。
 
@@ -334,9 +368,9 @@ def build_report(root: Path, files, only=None):
                       "status": status, "evidence": ev, "hint": hint})
 
     if not only or 21 in only:
+        status, ev, hint = check_eval_report(root)
         items.append({"id": 21, "group": "评测", "name": "报告含失败样本",
-                      "status": "manual", "evidence": [],
-                      "hint": "人工检查最近一次评测报告是否含失败样本的真实输入输出与归因"})
+                      "status": status, "evidence": ev, "hint": hint})
 
     if not only or {28, 29, 30} & only:
         for rec in check_skills(root):

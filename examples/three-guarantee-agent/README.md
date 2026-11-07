@@ -14,14 +14,14 @@
 | 评测 | 12 条冒烟用例，replay 回放，零成本可复现 |
 | 运维 | 结构化日志、token 计量、成本三层上限 |
 
-当前机械核对结果：**pass 22 / fail 0 / manual 5 / n/a 3**，可自行复现：
+当前机械核对结果：**pass 23 / fail 0 / manual 4 / n/a 3**，可自行复现：
 
 ```bash
 cd examples/three-guarantee-agent
 python3 ../../skill/check-agent-standards/scripts/check_agent_standards.py --project . --all
 ```
 
-其中 5 项 manual（工具数量与选择策略、记忆写入判据、强制输出引用、报告含失败样本、输出过滤）需人工判定；3 项 n/a 是技能类核对项，本工程没有 `skill/` 目录，不适用。
+其中 4 项 manual（工具数量与选择策略、记忆写入判据、强制输出引用、输出过滤）需人工判定；3 项 n/a 是技能类核对项，本工程没有 `skill/` 目录，不适用。
 
 ## 二、环境
 
@@ -96,6 +96,16 @@ PYTHONPATH=src python3 -m tga.eval.runner --suite smoke --json
 
 用例写错（`reason` 不在五类内、`context_override` 键名或类型不对、目录为空）会在加载期直接报错，不会静默跑成"零失败全绿"。
 
+### 负样本集：证明失败归因真的可用
+
+冒烟集永远全绿，只能证明"没坏"，证明不了"坏的时候说得清"。`evals/negative/` 放的是**判定项故意写错**的用例，跑它必然红，退出码必然是 `1`：
+
+```bash
+PYTHONPATH=src python3 -m tga.eval.runner --suite negative
+```
+
+`evals/reports/negative-20261107.txt` 是这条命令的真实输出（原样保存，未编辑）：7 条未命中逐项列出，并带上真实输入、实际答复、调用工具与错误码。这也是核对项"报告含失败样本"的证据——只写通过率、没有失败明细的报告不算证据。
+
 ## 六、高危操作的人工确认
 
 `submit_appeal_ticket` 属高危写操作：主循环只登记待确认项并回 `approval_required`，**模型和主循环都拿不到确认令牌**，必须由人执行：
@@ -114,7 +124,9 @@ PYTHONPATH=src python3 -m tga.confirm --id <令牌> --reject   # 拒绝，不执
 config/            配置与提示词（prompt 版本在 frontmatter 里，与配置不一致启动即报错）
 data/              本地模拟数据：条款库、车辆档案、三包规则
 evals/smoke/       评测用例，一文件一条
+evals/negative/    负样本用例，判定项故意写错，跑红是预期
 evals/replay/      回放录制，按输入原文匹配
+evals/reports/     真实评测报告留档（失败归因证据）
 src/tga/           代码：loop / tools / context / safety / eval / ops
 runtime/           运行期产物（会话快照、确认项、工单、幂等记录），不进版本库
 ```
