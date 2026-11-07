@@ -5,5 +5,6 @@ __pycache__/
 .vscode/
 *.pre-agent-forge-*
 
-# 本机全局 gitignore 含 SKILL.md 规则，会吞掉技能入口文件；项目内显式反忽略
+# 本机全局 gitignore 含 SKILL.md / AGENTS.md 规则，会吞掉技能入口与项目铁律；项目内显式反忽略
 !**/SKILL.md
+!AGENTS.md
