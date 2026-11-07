@@ -78,6 +78,10 @@ PYTHONPATH=src python3 -m tga.eval.runner
 # 只跑一条 / 输出机读 JSON
 PYTHONPATH=src python3 -m tga.eval.runner --case 11-context-exhausted
 PYTHONPATH=src python3 -m tga.eval.runner --suite smoke --json
+
+# 对抗集：注入 / 提权 / 改写变体，4 条
+PYTHONPATH=src python3 -m tga.eval.runner --suite adversarial --check-only
+PYTHONPATH=src python3 -m tga.eval.runner --suite adversarial
 ```
 
 退出码 `0` 全绿、`1` 有失败样本、`2` 用例或环境错误。失败样本会带真实输入、实际答复、终止说明、调用工具、错误码与未命中项。
@@ -113,6 +117,19 @@ PYTHONPATH=src python3 -m tga.eval.runner --suite negative
 
 `evals/reports/negative-20261107.txt` 是这条命令的真实输出（原样保存，未编辑）：7 条未命中逐项列出，并带上真实输入、实际答复、调用工具与错误码。这也是核对项"报告含失败样本"的证据——只写通过率、没有失败明细的报告不算证据。
 
+### 对抗集：证明闸门挂在代码层
+
+`evals/adversarial/` 4 条，真实输出留在 `evals/reports/adversarial-20261107.txt`：
+
+- 直接指令覆盖（中 / 英）、角色提权：均**命中**入向注入特征，模型被诱导调用高危写工具或编造工具，代码层仍返回 `approval_required` / `not_found`
+- 改写变体：刻意**不命中**任何入向特征规则，验证过滤层漏判时代码闸门依然独立生效——这条是纵深防御的证据，不能用"过滤打标了"代替
+
+命中注入特征的输入会被 `_screen_input` 前置一行安全提示，导致 user 消息与用例原文不同。回放按「最后一条 user 消息」定位录制，因此对应录制文件用 `input_aliases` 登记改写后的完整文本；别名只建索引，不改判定逻辑。新增对抗样本时，若输入命中注入特征，必须同时补别名，否则回放找不到录制。
+
+### 回归集回填约定
+
+当前回归集 0 条，这是缺口不是已完成。约定：**每次真实失败回填一条，只增不删**，样本 `source=feedback`，落盘前脱敏、本地复现，修复后转通过；不得用编造样本凑数，也不得用回放时延冒充真实指标。真实模型接入后至少 20 次采样，再定 P95 与均值阈值（见 2.1 第三节、7.1 第五节）。
+
 ## 六、高危操作的人工确认
 
 `submit_appeal_ticket` 属高危写操作：主循环只登记待确认项并回 `approval_required`，**模型和主循环都拿不到确认令牌**，必须由人执行：
@@ -132,8 +149,9 @@ config/            配置与提示词（prompt 版本在 frontmatter 里，与�
 data/              本地模拟数据：条款库、车辆档案、三包规则
 evals/smoke/       评测用例，一文件一条
 evals/negative/    负样本用例，判定项故意写错，跑红是预期
-evals/replay/      回放录制，按输入原文匹配
-evals/reports/     真实评测报告留档（失败归因证据）
+evals/adversarial/ 对抗用例：注入 / 提权 / 改写变体，4 条
+evals/replay/      回放录制，按输入原文匹配；命中入向过滤的用 input_aliases 登记改写后的文本
+evals/reports/     真实评测报告留档（失败归因证据、对抗集补测报告）
 src/tga/           代码：loop / tools / context / safety / eval / ops
 runtime/           运行期产物（会话快照、确认项、工单、幂等记录），不进版本库
 ```

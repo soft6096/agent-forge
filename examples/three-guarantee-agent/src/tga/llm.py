@@ -73,7 +73,7 @@ class ReplayProvider:
     name = "replay"
 
     def __init__(self, replay_dir: Path):
-        """扫描录制目录，建立 input 原文与输入哈希两套索引。
+        """扫描录制目录，建立 input 原文、输入别名与输入哈希三套索引。
 
         :param replay_dir: 录制目录，一个文件对应用例的一组轮次
         """
@@ -103,6 +103,14 @@ class ReplayProvider:
             input_text = data.get("input")
             if isinstance(input_text, str) and input_text:
                 self._by_input[input_text] = path
+
+            # 3. 别名索引：入向过滤命中注入特征时会给 user 消息前置一行安全提示，
+            #    回放又按"最后一条 user 消息"定位录制，不带别名会永远命中不到对抗样本
+            aliases = data.get("input_aliases")
+            if isinstance(aliases, list):
+                for alias in aliases:
+                    if isinstance(alias, str) and alias:
+                        self._by_input[alias] = path
             turns = data.get("turns")
             self._turns[path.stem] = turns if isinstance(turns, list) else [data]
 
