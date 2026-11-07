@@ -14,14 +14,21 @@
 | 评测 | 12 条冒烟用例，replay 回放，零成本可复现 |
 | 运维 | 结构化日志、token 计量、成本三层上限 |
 
-当前机械核对结果：**pass 23 / fail 0 / manual 4 / n/a 3**，可自行复现：
+当前核对结果：**pass 26 / fail 0 / n/a 4**（脚本输出 pass 23 / manual 4 / n/a 3，4 项 manual 已人工判定，见下表），可自行复现：
 
 ```bash
 cd examples/three-guarantee-agent
 python3 ../../skill/check-agent-standards/scripts/check_agent_standards.py --project . --all
 ```
 
-其中 4 项 manual（工具数量与选择策略、记忆写入判据、强制输出引用、输出过滤）需人工判定；3 项 n/a 是技能类核对项，本工程没有 `skill/` 目录，不适用。
+| # | 核对项 | 脚本状态 | 人工判定 | 证据 |
+|---|---|---|---|---|
+| 8 | 工具数量与选择策略 | manual | pass | 4 个工具（3 只读 + 1 高危写），低于 15 个上限参考；src/tga/tools/builtin.py:450 |
+| 14 | 记忆写入判据 | manual | n/a | 本示例有意不做长期记忆（见第七节），无记忆层即不存在写入判据 |
+| 17 | 强制输出引用 | manual | pass | config/prompts/system.md:12 要求事实性结论带 `[n]` 出处；用例 02-clause-miss 断言未命中不得编造出处 |
+| 27 | 输出过滤 | manual | pass | src/tga/safety/filters.py:144 对模型输出做出向脱敏 |
+
+另有 3 项 n/a 是技能类核对项，本工程没有 `skill/` 目录，不适用。
 
 ## 二、环境
 
