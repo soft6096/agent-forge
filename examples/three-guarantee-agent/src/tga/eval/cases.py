@@ -9,8 +9,10 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any, get_type_hints
 
 from ..loop import TermReason
+from ..settings import ContextSettings
 
 # 判定条件里必须显式给出的字段；其余按默认值（不限制）处理
 _REQUIRED_EXPECT_FIELDS = ("reason", "max_steps")
@@ -25,6 +27,7 @@ class CaseExpect:
     tools_used: tuple[str, ...] = ()           # 期望被调用过的工具，按"包含"判定
     answer_contains: tuple[str, ...] = ()      # 答复里必须出现的片段
     answer_not_contains: tuple[str, ...] = ()  # 答复里不允许出现的片段（如编造的条款号）
+    detail_contains: tuple[str, ...] = ()      # 终止说明里必须出现的片段，用于非 completed 分支
     tool_error_codes: tuple[str, ...] = ()     # 期望出现的工具错误码，按集合相等判定
 
 
@@ -38,6 +41,10 @@ class Case:
     cancel_before_run: bool  # 是否在开跑前置中断标志，用于覆盖 cancelled 分支
     note: str               # 这条用例覆盖什么，失败时直接进报告
     path: Path              # 用例文件路径，便于定位
+    # 用例级配置覆盖：只用于构造极端场景（如把窗口压到很小来验证降级），不改变默认配置
+    context_override: dict[str, float] | None = None
+    requires_recording: bool = True   # 是否需要 replay 录制；纯终止分支用例可以不录
+    confirm_pending: bool = False     # 跑完后是否模拟人工确认，验证高危操作的开闸通道
 
 
 def load_cases(suite_dir: Path, only: str | None = None) -> list[Case]:
@@ -116,8 +123,11 @@ def _parse_case(path: Path) -> Case:
         tools_used=tuple(str(x) for x in (raw.get("tools_used") or ())),
         answer_contains=tuple(str(x) for x in (raw.get("answer_contains") or ())),
         answer_not_contains=tuple(str(x) for x in (raw.get("answer_not_contains") or ())),
+        detail_contains=tuple(str(x) for x in (raw.get("detail_contains") or ())),
         tool_error_codes=tuple(str(x) for x in (raw.get("tool_error_codes") or ())),
     )
+
+    # 5. 配置覆盖与两个开关：配置覆盖的键名、取值都在这里校验
     return Case(
         case_id=case_id,
         input_text=input_text,
@@ -125,4 +135,46 @@ def _parse_case(path: Path) -> Case:
         cancel_before_run=bool(data.get("cancel_before_run", False)),
         note=str(data.get("note") or ""),
         path=path,
+        context_override=_parse_context_override(case_id, data.get("context_override")),
+        requires_recording=bool(data.get("requires_recording", True)),
+        confirm_pending=bool(data.get("confirm_pending", False)),
     )
+
+
+def _parse_context_override(case_id: str, raw: Any) -> dict[str, float] | None:
+    """解析用例级配置覆盖，键名与取值在加载期就校验。
+
+    WHY: 覆盖只用于构造极端场景；键名写错若静默忽略，用例会跑在默认配置下，
+    判定却按极端场景写，最后得到一条永远说不清原因的假失败。
+
+    :param case_id: 用例 id，用于报错定位
+    :param raw: JSON 里的 context_override 段，可为 None
+    :return: 覆盖字典；缺省或空对象返回 None
+    :raises ValueError: 不是对象、键名不在上下文预算表、取值不是数值
+    """
+    # 1. 缺省：不覆盖，按全局配置跑
+    if raw is None:
+        return None
+    if not isinstance(raw, dict):
+        raise ValueError("用例 %s 的 context_override 必须是对象" % case_id)
+
+    # 2. 逐项校验：键必须在上下文预算表里，取值按目标字段的类型转换
+    hints = get_type_hints(ContextSettings)
+    parsed: dict[str, float] = {}
+    for key, value in raw.items():
+        name = str(key)
+        if name not in hints:
+            raise ValueError(
+                "用例 %s 的 context_override 含未知字段 %s（可覆盖：%s）"
+                % (case_id, name, " / ".join(sorted(hints)))
+            )
+        try:
+            number = float(value)
+        except (TypeError, ValueError):
+            raise ValueError(
+                "用例 %s 的 context_override.%s 必须是数值" % (case_id, name)
+            ) from None
+        # 整型字段保持整型：预算表里窗口、配额都是整数，留成浮点会让下游格式化出错
+        parsed[name] = int(number) if hints[name] is int else number
+
+    return parsed or None

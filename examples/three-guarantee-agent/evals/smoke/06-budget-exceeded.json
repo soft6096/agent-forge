@@ -3,7 +3,8 @@
   "input": "把三包规定的全部条款原文念一遍",
   "expect": {
     "reason": "budget_exceeded",
-    "max_steps": 1
+    "max_steps": 1,
+    "detail_contains": ["预算耗尽"]
   },
   "note": "单次调用即超 token 预算：必须报预算耗尽，不能当成功返回"
 }

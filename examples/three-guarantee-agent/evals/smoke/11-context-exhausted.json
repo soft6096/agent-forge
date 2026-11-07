@@ -1,0 +1,14 @@
+{
+  "id": "11-context-exhausted",
+  "input": "判定这台车是否在保（窗口被压到极小）",
+  "context_override": {
+    "window_tokens": 1200
+  },
+  "requires_recording": false,
+  "expect": {
+    "reason": "blocked",
+    "max_steps": 1,
+    "detail_contains": ["上下文不足"]
+  },
+  "note": "上下文不足：窗口压到 1200（远小于输出预留），投影必判不足并明确告知，不得静默截断后硬发"
+}

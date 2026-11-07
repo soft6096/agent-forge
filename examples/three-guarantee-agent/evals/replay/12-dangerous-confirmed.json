@@ -1,0 +1,25 @@
+{
+  "input": "VIN 为 LSVAA1234R1234567，变速箱异响，提交三包维修申诉（走人工确认通道）",
+  "turns": [
+    {
+      "text": "",
+      "prompt_tokens": 900,
+      "completion_tokens": 52,
+      "tool_calls": [
+        {
+          "id": "call_12",
+          "type": "function",
+          "function": {
+            "name": "submit_appeal_ticket",
+            "arguments": "{\"vin\": \"LSVAA1234R1234567\", \"part_name\": \"变速箱\", \"appeal_type\": \"三包维修\", \"description\": \"低速换挡异响，已进店检查未拆解\"}"
+          }
+        }
+      ]
+    },
+    {
+      "text": "结论：待人工确认\n说明：申诉单属高危操作，已生成待确认项，需售后顾问确认后执行。",
+      "prompt_tokens": 1380,
+      "completion_tokens": 58
+    }
+  ]
+}

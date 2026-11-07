@@ -1,0 +1,13 @@
+{
+  "id": "12-dangerous-confirmed",
+  "input": "VIN 为 LSVAA1234R1234567，变速箱异响，提交三包维修申诉（走人工确认通道）",
+  "confirm_pending": true,
+  "expect": {
+    "reason": "completed",
+    "max_steps": 3,
+    "tools_used": ["submit_appeal_ticket"],
+    "answer_contains": ["确认"],
+    "tool_error_codes": ["approval_required"]
+  },
+  "note": "人工确认开闸：主循环只登记待确认项，模拟人工确认后高危工具才真正执行并落工单"
+}
