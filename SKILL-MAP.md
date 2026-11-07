@@ -93,7 +93,7 @@
 | 10 | check-agent-standards | 核对 | 可机械判定的规范兜底扫描 + 证据报告 | 核对报告（JSON/MD） |
 | 11 | agent-forge-source-law | 元 | 区分开发源与安装产物，禁止拿源目录当安装源 | 安装回执 |
 
-> 落地状态：# 1~10 已发布；# 11（agent-skill-authoring）为规划中，无对应目录。
+> 落地状态：第 1~8、10、11 已发布（共 10 个目录）；第 9 号 agent-skill-authoring 为规划中，无对应目录。
 
 ---
 
@@ -391,13 +391,17 @@ agent-forge/
 
 ---
 
-## 11. 未决事项
+## 11. 未决事项（2026-11-07 定案）
 
-1. 语言与栈范围：是否限定 Java（对齐 jee-forge 受众），还是语言中立。当前规划默认语言中立，示例以 Java 与 Python 各一。
-2. 评测工具链：是否自带评测 runner（类似 test-workflow 的 runner），还是只定口径、由用户自选工具。
-3. 第三批的 rag-standards 是否需要自带最小检索基线实现。
-4. 是否提供 quick-change 类的小改动旁路技能（agent 项目改提示词、换模型、调阈值属于高频小改动，可能值得单列）。
-5. 是否建立示例 agent 工程（examples/）用于回归验证规范是否可落地。
+> 原第 1~5 条已逐条定案，结论与依据如下。新问题追加到表尾，不覆盖历史结论。
+
+| # | 事项 | 结论 | 依据 |
+|---|---|---|---|
+| 1 | 语言与栈范围 | 语言中立，不绑定 Java；示例统一 Python，零第三方依赖 | examples/three-guarantee-agent/src/tga/ 全部为 .py；第 3 节各技能职责未出现栈限定 |
+| 2 | 是否自带评测 runner | 技能只定口径，不随技能分发 runner；可运行 runner 落在示例工程作为参照实现 | skill/agent-eval-standards/ 仅 SKILL.md + standards/ 三份，无 scripts/；examples/three-guarantee-agent/src/tga/eval/runner.py |
+| 3 | rag-standards 是否自带最小检索基线 | 不带；只给口径与阈值判据，最小可跑模拟放示例 | skill/agent-rag-standards/ 仅 SKILL.md + standards/ 三份，无实现代码；examples/three-guarantee-agent/src/tga/tools/builtin.py:196 为本地关键词 + 阈值模拟 |
+| 4 | 是否单列 quick-change 旁路技能 | 不单列，由 agent-dev-workflow 的轻量模式与小改动短路承接 | skill/agent-dev-workflow/SKILL.md:18-36 |
+| 5 | 是否建示例 agent 工程 | 已建，作为规范可落地性与回归验证的基准 | examples/three-guarantee-agent/（冒烟 12 条 + 负样本 7 条 + 真实失败报告 evals/reports/negative-20261107.txt） |
 
 ---
 
