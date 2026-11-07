@@ -15,6 +15,8 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any
 
+from .context.budget import estimate_tokens
+from .context.window import DEGRADE_EXCEEDED, ContextWindow
 from .llm import LLMProvider, ModelError
 from .ops.cost import Budget
 from .ops.logging import StructuredLogger
@@ -89,6 +91,14 @@ class AgentLoop:
         self._tools = tools
         # 工具清单在装配期算一次：每步重算既浪费也容易与登记状态不一致
         self._tool_schemas = tools.schemas() if tools is not None else None
+        # 工具描述的 token 占用同样只算一次，用于上下文预算核算
+        self._tool_tokens = (
+            estimate_tokens(json.dumps(self._tool_schemas, ensure_ascii=False))
+            if self._tool_schemas
+            else 0
+        )
+        # 上下文投影器：状态完整保留，只有发出去的请求受预算约束
+        self._context = ContextWindow(settings.context)
         self._budget = Budget(settings.budget)
         self._deadline_ms = int(time.time() * 1000) + settings.timeout.task_ms
         self._cancel_requested = False
@@ -96,8 +106,6 @@ class AgentLoop:
         # 工具级重试次数：只对可重试错误生效，写类工具靠幂等键保证重复执行收敛
         self._max_tool_retries = 1
         self._recent_tool_signatures: list[str] = []
-        # 工具结果单条截断上限：不截断的话一次大结果就能吃掉大半上下文预算
-        self._max_tool_chars = 4000
 
     def request_cancel(self) -> None:
         """由入口的信号处理调用，下一步检查点生效。"""
@@ -129,8 +137,26 @@ class AgentLoop:
             if self._task_timeout():
                 return self._terminate(TermReason.STEP_EXHAUSTED, state, "任务总时长超限")
 
+            # 上下文投影：状态是事实不裁剪，这里只决定本次请求带哪些内容
+            messages, report = self._context.project(state.messages, step, self._tool_tokens)
+            if report.degraded == DEGRADE_EXCEEDED:
+                return self._terminate(
+                    TermReason.BLOCKED,
+                    state,
+                    "上下文不足：裁剪后仍超出窗口（占用 %d token），请缩短输入或分次提问"
+                    % report.after_tokens,
+                )
+            if report.trimmed:
+                self._log.log(
+                    step_no=step,
+                    tool_name="context",
+                    result_code="trimmed",
+                    event="context_trim",
+                    extra=report.to_log(),
+                )
+
             try:
-                resp = self._call_llm(state)
+                resp = self._call_llm(messages, step)
             except ModelError as exc:
                 if exc.retryable:
                     return self._terminate(
@@ -181,10 +207,11 @@ class AgentLoop:
 
     # ---------- 内部步骤 ----------
 
-    def _call_llm(self, state: SessionState):
+    def _call_llm(self, messages: list[dict[str, Any]], step_no: int):
         """调一次模型，带单次超时与有限重试。
 
-        :param state: 当前会话状态，提供消息历史与步序号
+        :param messages: 已投影的上下文（不是会话全量消息）
+        :param step_no: 当前步序号，用于日志
         :return: 模型回复，含文本、用量与 tool_calls
         :raises ModelError: 重试耗尽或不可重试时上抛，由主循环映射成终止原因
         """
@@ -197,14 +224,14 @@ class AgentLoop:
             # 2. 发起调用：超时与工具清单都由骨架传入，Provider 只管这一次请求
             try:
                 resp = self._provider.complete(
-                    state.messages,
+                    messages,
                     timeout_ms=self._s.timeout.llm_ms,
                     tools=self._tool_schemas,
                 )
             except ModelError as exc:
                 span.finish("error")
                 self._log.log(
-                    step_no=state.step_no,
+                    step_no=step_no,
                     tool_name="llm",
                     elapsed_ms=span.elapsed_ms,
                     result_code="model_error",
@@ -219,7 +246,7 @@ class AgentLoop:
 
             span.finish("ok")
             self._log.log(
-                step_no=state.step_no,
+                step_no=step_no,
                 tool_name="llm",
                 tokens={"prompt": resp.prompt_tokens, "completion": resp.completion_tokens},
                 elapsed_ms=span.elapsed_ms,
@@ -240,11 +267,7 @@ class AgentLoop:
         :return: 需要终止时返回 TaskResult；继续下一步返回 None
         """
         # 1. 不收敛识别：只取工具名与参数做签名，同一批调用连续 3 步出现即判定原地打转
-        signature = json.dumps(
-            [{"name": _call_name(c), "arguments": _call_arguments(c)} for c in tool_calls],
-            sort_keys=True,
-            ensure_ascii=False,
-        )
+        signature = self._tool_call_signature(tool_calls)
         self._recent_tool_signatures.append(signature)
         if self._recent_tool_signatures[-3:] == [signature] * 3:
             state.status = "blocked"
@@ -274,9 +297,10 @@ class AgentLoop:
             # 外部内容隔离：工具返回一律按数据处理，包进固定分隔符并声明不是指令
             if self._s.safety.external_content_isolation:
                 content = wrap_external(content, name or "unknown")
+            # WHY: 回填保留完整结果——状态是事实；超预算的裁剪在发送前由上下文投影做
             state.add_message(
                 "tool",
-                self._truncate(content),
+                content,
                 tool_call_id=str(call.get("id") or ""),
                 name=name,
             )
@@ -403,15 +427,17 @@ class AgentLoop:
         # 3. 返回最终结果，重试次数由骨架控制，模型无权决定
         return outcome
 
-    def _truncate(self, content: str) -> str:
-        """截断过长的工具结果，避免单条结果吃掉大半上下文预算。
+    def _tool_call_signature(self, tool_calls: list[dict[str, Any]]) -> str:
+        """计算一批工具调用的签名，用于识别模型原地打转。
 
-        :param content: 序列化后的工具结果
-        :return: 原内容，或截断后附带说明的内容
+        :param tool_calls: 本步模型请求的工具调用
+        :return: 只含工具名与参数的稳定字符串
         """
-        if len(content) <= self._max_tool_chars:
-            return content
-        return content[: self._max_tool_chars] + "…[结果已截断，原文 %d 字符]" % len(content)
+        return json.dumps(
+            [{"name": _call_name(item), "arguments": _call_arguments(item)} for item in tool_calls],
+            sort_keys=True,
+            ensure_ascii=False,
+        )
 
     def _task_timeout(self) -> bool:
         """任务级超时：与单次调用超时是两回事，必须分开判。"""

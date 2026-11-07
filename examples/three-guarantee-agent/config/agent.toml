@@ -29,6 +29,18 @@ enabled = true                     # 关闭后写类工具失去重复保护，�
 dir = "runtime/idempotency"        # 幂等键与结果落盘目录，不进版本库
 window_s = 7200                    # 去重窗口 2 小时，远大于单任务 120s，留足重试余量
 
+[context]
+# 五段预算加总必须 ≤ window_tokens × 0.95，缺一段就等于给某类内容开无限额度。
+# 单轮任务把额度让给检索与输出预留，历史只留滑窗与摘要。
+window_tokens = 128000             # 模型窗口上限
+system = 8000                      # 系统提示词（不可变段，永不裁剪）
+tools = 16000                      # 工具描述
+history = 8000                     # 历史（含结构摘要）
+retrieval = 40000                  # 检索与工具返回等外部内容
+output_reserve = 24000             # 输出预留，≥ 1.5 × max_output_tokens，不可压缩
+compress_at = 0.75                 # 达到 75% 触发裁剪，不靠报错兜底
+keep_recent_messages = 12          # 至少保留的近期原文条数
+
 [timeout]
 llm_ms = 30000                     # 单次模型调用超时
 tool_ms = 8000                     # 单次工具调用超时

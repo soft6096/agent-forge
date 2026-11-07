@@ -71,6 +71,47 @@ class SafetySettings:
 
 
 @dataclass(frozen=True)
+class ContextSettings:
+    """上下文预算表：五段配额 + 压缩阈值。全部来自配置，代码里不出现窗口魔数。"""
+
+    window_tokens: int          # 模型窗口上限
+    system: int                 # 系统提示词（不可变段）配额
+    tools: int                  # 工具描述配额
+    history: int                # 历史（含摘要）配额
+    retrieval: int              # 检索与外部内容配额
+    output_reserve: int         # 输出预留，不得少于 1.5 倍最大输出
+    compress_at: float          # 达到该占比触发裁剪
+    keep_recent_messages: int   # 至少保留的近期原文条数
+
+    @property
+    def usable_tokens(self) -> int:
+        """可用总预算：窗口的 95%，留 5% 给估算误差与 tokenizer 开销。"""
+        return int(self.window_tokens * 0.95)
+
+    def validate(self, max_output_tokens: int) -> None:
+        """校验预算表自洽，启动期就报错而不是等撞墙。
+
+        :param max_output_tokens: 模型单次最大输出 token，用于校验输出预留
+        :raises ValueError: 加总超窗口、输出预留不足或压缩阈值越界时抛出
+        """
+        # 1. 五段加总不得超过可用窗口
+        total = self.system + self.tools + self.history + self.retrieval + self.output_reserve
+        if total > self.usable_tokens:
+            raise ValueError(
+                "上下文预算加总 %d 超过可用窗口 %d" % (total, self.usable_tokens)
+            )
+
+        # 2. 输出预留至少 1.5 倍最大输出，禁止占满窗口再让模型说话
+        floor = int(max_output_tokens * 1.5)
+        if self.output_reserve < floor:
+            raise ValueError("输出预留 %d 低于下限 %d（1.5 × 最大输出）" % (self.output_reserve, floor))
+
+        # 3. 压缩阈值必须在 0.6~0.9，太晚压缩等于没压缩
+        if not 0.6 <= self.compress_at <= 0.9:
+            raise ValueError("compress_at 应在 0.6~0.9，当前 %s" % self.compress_at)
+
+
+@dataclass(frozen=True)
 class EvalSettings:
     """评测入口配置，0.0 第 8 项的判据。"""
 
@@ -110,6 +151,7 @@ class Settings:
     eval: EvalSettings
     retrieval: RetrievalSettings
     idempotency: IdempotencySettings
+    context: ContextSettings
     project_root: Path
 
     @property
@@ -145,6 +187,20 @@ def load_settings(config_path: Path | None = None) -> Settings:
     ev = data["eval"]
     retrieval = data["retrieval"]
     idem = data["idempotency"]
+    ctx = data["context"]
+
+    # 预算表在装配期校验：加总超窗口或输出预留不足，启动就失败，不留到运行期撞墙
+    context = ContextSettings(
+        window_tokens=int(ctx["window_tokens"]),
+        system=int(ctx["system"]),
+        tools=int(ctx["tools"]),
+        history=int(ctx["history"]),
+        retrieval=int(ctx["retrieval"]),
+        output_reserve=int(ctx["output_reserve"]),
+        compress_at=float(ctx["compress_at"]),
+        keep_recent_messages=int(ctx["keep_recent_messages"]),
+    )
+    context.validate(int(model["max_output_tokens"]))
 
     return Settings(
         name=agent["name"],
@@ -192,5 +248,6 @@ def load_settings(config_path: Path | None = None) -> Settings:
             dir=str(idem["dir"]),
             window_s=int(idem["window_s"]),
         ),
+        context=context,
         project_root=PROJECT_ROOT,
     )
