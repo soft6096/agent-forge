@@ -72,6 +72,31 @@ T18 复测只命中 `agent-dev-workflow`，eval 不再被拉入。同批复测�
 
 > 2026-11-07 复核：仍未执行真实选择器实测，因此 agent-skill-authoring 的定稿前置条件未满足（见 SKILL-MAP 4.9）。执行方式：新开会话，逐条粘贴 T04 / T05 / T06 / T08 / T18 的 input 原话，记录实际加载的技能后再回填本节判定记录。
 
+### 实测执行清单（待回填）
+
+下面五行按 T04 / T05 / T06 / T08 / T18 顺序排列，可直接逐条复制进**新开的会话**，不要补充背景、不要加前缀：
+
+```
+这个 agent 死循环了，一直调同一个工具停不下来
+会话中断之后恢复不了状态，只能从头再问一遍
+上下文老是不够用，历史越堆越多，最后直接被截断
+用户能不能通过上传的 PDF 里写指令，让 agent 把数据删了
+提示词改了一句，感觉效果好像好点
+```
+
+| 样本 | expect_main | must_not | 实际加载的技能 | 判定 |
+|---|---|---|---|---|
+| T04 | agent-core-standards | agent-tool-standards | 待实测 | 待回填 |
+| T05 | agent-core-standards | agent-context-memory-standards | 待实测 | 待回填 |
+| T06 | agent-context-memory-standards | agent-core-standards | 待实测 | 待回填 |
+| T08 | agent-safety-standards（tool 可伴随） | agent-rag-standards | 待实测 | 待回填 |
+| T18 | agent-dev-workflow（check 可伴随） | agent-rag / ops / tool / eval | 待实测 | 待回填 |
+
+判定口径按第 36~40 行的三条规则：expect_main 有漏命中即 fail；must_not 有命中即 fail；其余 pass。
+实测完成后把「实际加载的技能」与「判定」两列回填，并在第 44 行的判定记录表追加一行（轮次写 `v3（真实选择器）`、日期、结论、改动）。
+
+> 未回填前，本清单只算执行准备，不算实测完成；`SKILL-MAP.md:215` 的前置条件①仍为未完成，`agent-skill-authoring` 不启动定稿。禁止用盲判结果冒充真实选择器实测。
+
 ## 维护
 
 - 每次真实误触发 / 漏触发都要回填一条样本（来源写"真实"），只增不删
