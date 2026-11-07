@@ -27,6 +27,17 @@ SKIP_DIRS = {
     "out", ".gradle", ".mvn", "docs", ".next", "coverage",
 }
 
+# 运行期产物目录：只在本机跑过之后才存在，通常也在 .gitignore 里。
+# 为什么要单独排除：这些目录里的 session 快照、确认项、工单看起来"命中"了
+# session_id / approval / untrusted，但它们不是实现，换台机器 clone 下来就跑不出同样的
+# 证据——证据不可复现比没有证据更糟，它让人相信已经合规。
+SKIP_RUNTIME_DIRS = {
+    "runtime", "logs", "log", "tmp", "temp", ".cache", ".pytest_cache",
+    ".mypy_cache", ".ruff_cache", "site-packages",
+}
+
+SKIP_ALL_DIRS = SKIP_DIRS | SKIP_RUNTIME_DIRS
+
 CODE_EXTS = {".py", ".java", ".kt", ".ts", ".tsx", ".js", ".jsx", ".go", ".cs", ".rb", ".php"}
 CONF_EXTS = {".yml", ".yaml", ".json", ".toml", ".ini", ".properties", ".conf", ".env"}
 SCAN_EXTS = CODE_EXTS | CONF_EXTS
@@ -71,10 +82,10 @@ SELF_NAMES = {"check_agent_standards.py"}
 
 
 def collect(scope: Path):
-    """收集待扫描的代码与配置文件（跳过依赖与产物目录）。"""
+    """收集待扫描的代码与配置文件（跳过依赖、构建与运行期产物目录）。"""
     files = []
     for dirpath, dirnames, filenames in os.walk(scope):
-        dirnames[:] = [d for d in dirnames if d not in SKIP_DIRS and not d.startswith(".")]
+        dirnames[:] = [d for d in dirnames if d not in SKIP_ALL_DIRS and not d.startswith(".")]
         for name in filenames:
             p = Path(dirpath) / name
             if p.suffix.lower() not in SCAN_EXTS:
@@ -159,9 +170,26 @@ def search(files, root: Path, pattern: str, limit: int = 3):
     return hits
 
 
+def in_skipped_dir(root: Path, p: Path) -> bool:
+    """判断路径是否落在被跳过的目录里。
+
+    用于 rglob 这类不经 os.walk 剪枝的遍历：不剪掉运行期产物，
+    evals 判定会拿 runtime 里的历史文件当证据。
+
+    :param root: 项目根
+    :param p: 待判断路径
+    :return: 位于依赖 / 构建 / 运行期产物目录（或以 . 开头的目录）之下返回 True
+    """
+    try:
+        parts = p.relative_to(root).parts[:-1]
+    except ValueError:
+        return False
+    return any(part in SKIP_ALL_DIRS or part.startswith(".") for part in parts)
+
+
 def find_dir(root: Path, names):
     for dirpath, dirnames, _ in os.walk(root):
-        dirnames[:] = [d for d in dirnames if d not in SKIP_DIRS and not d.startswith(".")]
+        dirnames[:] = [d for d in dirnames if d not in SKIP_ALL_DIRS and not d.startswith(".")]
         for d in list(dirnames):
             if d.lower() in names:
                 return Path(dirpath) / d
@@ -203,18 +231,26 @@ def check_eval_dataset(root: Path):
             return "pass", ["%s（%d 个数据文件）" % (rel(root, d), len(data))], ""
         return "fail", ["%s 存在但无数据文件" % rel(root, d)], "补评测数据文件（jsonl/json/yaml）"
     for p in root.rglob("*"):
+        if in_skipped_dir(root, p):
+            continue
         if p.is_file() and p.suffix.lower() == ".jsonl" and "eval" in p.name.lower():
             return "pass", [rel(root, p)], ""
     return "fail", [], "未找到评测集，建立 evals/ 目录并放入样本文件"
 
 
 def check_skills(root: Path):
-    """第 28~30 项：技能目录合规。"""
+    """第 28~30 项：技能目录合规。
+
+    没有 skill/ 目录的项目（例如只写 agent 代码的业务仓库）不是"没做到"，
+    而是这三项在当前项目形态下不存在，判 n/a 并写明原因；
+    判 manual 会被误解为"待人工确认"，等于虚增待办、也让 manual 计数失去意义。
+    """
     base = root / "skill"
     results = []
     if not base.is_dir():
         for i, name in ((28, "frontmatter 合规"), (29, "description 含触发语"), (30, "未超体积预算")):
-            results.append((i, "技能", name, "manual", [], "未发现 skill/ 目录，跳过"))
+            results.append((i, "技能", name, "n/a",
+                            ["本项目无 skill/ 目录，该项不适用"], ""))
         return results
 
     fm_bad, desc_bad, size_bad = [], [], []
@@ -315,6 +351,7 @@ def build_report(root: Path, files, only=None):
         "pass": sum(1 for i in items if i["status"] == "pass"),
         "fail": sum(1 for i in items if i["status"] == "fail"),
         "manual": sum(1 for i in items if i["status"] == "manual"),
+        "na": sum(1 for i in items if i["status"] == "n/a"),
     }
     return {"project": str(root), "files_scanned": len(files), "summary": summary, "items": items}
 
@@ -325,8 +362,8 @@ def render_md(report):
     out.append("# Agent 规范核对报告\n")
     out.append("- 项目：%s" % report["project"])
     out.append("- 扫描文件：%d" % report["files_scanned"])
-    out.append("- 汇总：pass %d / fail %d / manual %d（共 %d 项）\n"
-               % (s["pass"], s["fail"], s["manual"], s["total"]))
+    out.append("- 汇总：pass %d / fail %d / manual %d / n/a %d（共 %d 项）\n"
+               % (s["pass"], s["fail"], s["manual"], s["na"], s["total"]))
     out.append("| # | 组 | 核对项 | 状态 | 证据 | 建议 |")
     out.append("|---|---|---|---|---|---|")
     for i in report["items"]:
@@ -334,7 +371,8 @@ def render_md(report):
         out.append("| %d | %s | %s | %s | %s | %s |"
                    % (i["id"], i["group"], i["name"], i["status"], ev, i["hint"] or "—"))
     out.append("")
-    out.append("> fail 项必须修复或申请豁免；manual 项必须人工判定后填 pass/fail，禁止直接当 pass。")
+    out.append("> fail 项必须修复或申请豁免；manual 项必须人工判定后填 pass/fail，禁止直接当 pass；"
+               "n/a 表示该项在当前项目形态下不存在（须在证据里写明原因），既不算通过也不算待办。")
     return "\n".join(out)
 
 

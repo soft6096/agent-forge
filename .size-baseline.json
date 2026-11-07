@@ -13,7 +13,7 @@
   },
   "agent-eval-standards": {
     "load_lines": 266,
-    "load_bytes": 12273
+    "load_bytes": 12548
   },
   "agent-forge-source-law": {
     "load_lines": 53,
@@ -36,7 +36,7 @@
     "load_bytes": 15376
   },
   "check-agent-standards": {
-    "load_lines": 290,
-    "load_bytes": 11321
+    "load_lines": 295,
+    "load_bytes": 11910
   }
 }

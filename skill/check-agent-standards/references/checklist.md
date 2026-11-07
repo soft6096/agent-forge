@@ -1,7 +1,7 @@
 # 30 项核对判据与手工指令
 
 > 脚本不可用时按本文件手工执行。每项的「判定」写明什么算通过，「手工指令」给出可直接跑的 grep。
-> 通用目录：先排除 node_modules / venv / .git / target / dist / build。
+> 通用目录：先排除 node_modules / venv / .git / target / dist / build，以及运行期产物 runtime / logs / tmp / .cache——后者本机跑过才有，命中 session_id / approval / untrusted 的是产物不是实现，证据换台机器不复现。
 
 ---
 
@@ -194,6 +194,8 @@
 ---
 
 ## 技能
+
+> 28~30 只在含 skill/ 目录的仓库适用；业务仓库没有技能目录时判 n/a，不判 manual（manual 会虚增待办）。
 
 ### 28. frontmatter 合规
 
