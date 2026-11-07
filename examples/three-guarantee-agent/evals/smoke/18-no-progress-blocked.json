@@ -1,0 +1,11 @@
+{
+  "id": "18-no-progress-blocked",
+  "input": "在发动机和变速箱之间反复查同一批保修数据",
+  "expect": {
+    "reason": "blocked",
+    "max_steps": 5,
+    "tools_used": ["query_warranty_period"],
+    "detail_contains": ["无新增信息"]
+  },
+  "note": "无进展检测：参数交替变化、结果反复重复，连续 3 步没有新工具也没有新结果即终止"
+}

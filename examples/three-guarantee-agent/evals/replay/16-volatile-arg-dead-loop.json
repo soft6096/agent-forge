@@ -1,0 +1,37 @@
+{
+  "input": "重复查同一个零件的保修期，每次带不同时间戳",
+  "turns": [
+    {
+      "text": "",
+      "prompt_tokens": 800,
+      "completion_tokens": 30,
+      "tool_calls": [
+        {"id": "c16a", "type": "function", "function": {"name": "query_warranty_period", "arguments": "{\"vin\": \"LSVAA1234R1234567\", \"part_name\": \"变速箱\", \"request_id\": \"r-1\"}"}}
+      ]
+    },
+    {
+      "text": "",
+      "prompt_tokens": 860,
+      "completion_tokens": 30,
+      "tool_calls": [
+        {"id": "c16b", "type": "function", "function": {"name": "query_warranty_period", "arguments": "{\"part_name\": \"变速箱\", \"vin\": \"LSVAA1234R1234567\", \"request_id\": \"r-2\"}"}}
+      ]
+    },
+    {
+      "text": "",
+      "prompt_tokens": 920,
+      "completion_tokens": 30,
+      "tool_calls": [
+        {"id": "c16c", "type": "function", "function": {"name": "query_warranty_period", "arguments": "{\"vin\": \"LSVAA1234R1234567\", \"request_id\": \"r-3\", \"part_name\": \"变速箱\"}"}}
+      ]
+    },
+    {
+      "text": "",
+      "prompt_tokens": 980,
+      "completion_tokens": 30,
+      "tool_calls": [
+        {"id": "c16d", "type": "function", "function": {"name": "query_warranty_period", "arguments": "{\"vin\": \"LSVAA1234R1234567\", \"part_name\": \"变速箱\", \"request_id\": \"r-4\"}"}}
+      ]
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "id": "17-tool-failure-circuit-break",
+  "input": "连续三次调用同一个不存在的工具",
+  "expect": {
+    "reason": "blocked",
+    "max_steps": 3,
+    "tools_used": ["not_real_tool"],
+    "detail_contains": ["熔断"],
+    "tool_error_codes": ["not_found"]
+  },
+  "note": "工具级熔断：同一工具连续失败 3 次即终止，换参数重试也不能把计数清零"
+}

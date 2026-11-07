@@ -39,6 +39,18 @@ from .state import (
 from .tools.contract import ToolContext, ToolOutcome
 from .tools.registry import ToolRegistry
 
+# 同一工具连续失败到这个次数就熔断，本次任务内不再尝试（core 02 §3）
+TOOL_FAILURE_CIRCUIT_THRESHOLD = 3
+# 连续这么多步没有新增信息就判定原地打转（core 02 §5）
+NO_PROGRESS_STEP_LIMIT = 3
+# 易变参数字段：值每轮都变、但和业务语义无关，不能参与工具调用签名。
+# WHY 不剔除它们，模型每步多带一个时间戳就能把"完全相同的调用"伪装成新调用，
+# 重复调用检测永远不命中。匹配时统一小写并去掉前缀下划线。
+_VOLATILE_ARG_KEYS = frozenset({
+    "timestamp", "ts", "time", "nonce", "request_id", "req_id", "trace_id",
+    "random", "rand", "cache_buster", "client_time", "client_ts", "salt",
+})
+
 
 class TermReason(str, Enum):
     """五类终止原因，缺一类即骨架不完整。"""
@@ -114,6 +126,12 @@ class AgentLoop:
         # 工具级重试次数：只对可重试错误生效，写类工具靠幂等键保证重复执行收敛
         self._max_tool_retries = 1
         self._recent_tool_signatures: list[str] = []
+        # 工具连续失败计数：按工具名统计，不按参数指纹，换参数重试也逃不掉（core 02 §3）
+        self._tool_failures: dict[str, int] = {}
+        # 无进展检测：已见工具名、已见结果摘要、连续无进展步数（core 02 §5）
+        self._seen_tool_names: set[str] = set()
+        self._seen_result_digests: set[str] = set()
+        self._no_progress_steps = 0
 
     def request_cancel(self) -> None:
         """由入口的信号处理调用，下一步检查点生效。"""
@@ -360,6 +378,8 @@ class AgentLoop:
 
         # 3. 逐个执行：参数错误、越权、超时都回填给模型，让它自己改，不中断整轮任务
         context = self._tool_context(state)
+        step_names: list[str] = []
+        step_digests: list[str] = []
         for call in tool_calls:
             name = _call_name(call)
             arguments = _call_arguments(call)
@@ -370,7 +390,10 @@ class AgentLoop:
             )
             outcome = self._invoke_with_retry(name, arguments, context, step)
             # 执行完补结果摘要：空摘要即"执行中被打断"，恢复对账据此判定
-            record["result_digest"] = _result_digest(outcome)
+            digest = _result_digest(outcome)
+            record["result_digest"] = digest
+            step_names.append(name)
+            step_digests.append(digest)
 
             # 4. 回填：tool 消息必须带 tool_call_id 与 name，模型才知道结果属于哪个调用
             content = outcome.to_message_content()
@@ -396,8 +419,76 @@ class AgentLoop:
                 extra={"retryable": outcome.retryable, "duplicated": outcome.duplicated},
             )
 
-        # 6. 全部回填完成，交给下一步让模型基于结果继续推理
+            # 6. 熔断：按工具名累计连续失败，换参数重试也不能把计数清零
+            detail = self._track_tool_failure(name, outcome)
+            if detail:
+                return self._terminate(TermReason.BLOCKED, state, detail)
+
+        # 7. 无进展检测：连续多步既没新工具也没新结果，说明模型在原地打转
+        detail = self._check_no_progress(step_names, step_digests, step)
+        if detail:
+            return self._terminate(TermReason.BLOCKED, state, detail)
+
+        # 8. 全部回填完成，交给下一步让模型基于结果继续推理
         return None
+
+    def _track_tool_failure(self, name: str, outcome: ToolOutcome) -> str | None:
+        """按工具名累计连续失败，达到阈值返回熔断说明（core 02 §3）。
+
+        WHY 不按参数指纹计数：模型每步换个参数重试就能把计数清零，熔断等于没做。
+        成功一次即清零：参数改对之后应当允许继续用这个工具。
+
+        :param name: 工具名
+        :param outcome: 本次执行结果
+        :return: 需要终止时的说明；否则返回 None
+        """
+        # 1. 成功清零：只统计"连续"失败
+        if outcome.ok:
+            self._tool_failures.pop(name, None)
+            return None
+
+        # 2. 累计并判阈值
+        count = self._tool_failures.get(name, 0) + 1
+        self._tool_failures[name] = count
+        if count < TOOL_FAILURE_CIRCUIT_THRESHOLD:
+            return None
+        return (
+            "工具 %s 连续失败 %d 次，本次任务内熔断，不再尝试（core 02 §3）"
+            % (name, count)
+        )
+
+    def _check_no_progress(
+        self, names: list[str], digests: list[str], step: int
+    ) -> str | None:
+        """连续多步无新增信息即终止（core 02 §5）。
+
+        判定口径：本步既没有出现新工具名，也没有产生没见过的结果摘要，才算无进展；
+        换工具或拿到新结果都说明模型在推进，计数器必须清零。
+
+        :param names: 本步调用的工具名列表
+        :param digests: 本步各工具结果摘要列表
+        :param step: 当前步序号，用于终止说明
+        :return: 需要终止时的说明；否则返回 None
+        """
+        # 1. 找出本步真正的新信息
+        new_names = [name for name in names if name not in self._seen_tool_names]
+        new_digests = [item for item in digests if item not in self._seen_result_digests]
+
+        # 2. 有新工具或新结果 → 清零并登记，本步算有进展
+        if new_names or new_digests:
+            self._no_progress_steps = 0
+            self._seen_tool_names.update(new_names)
+            self._seen_result_digests.update(new_digests)
+            return None
+
+        # 3. 既没新工具也没新结果 → 累计，连续到阈值就终止
+        self._no_progress_steps += 1
+        if self._no_progress_steps < NO_PROGRESS_STEP_LIMIT:
+            return None
+        return (
+            "连续 %d 步无新增信息（无新工具、无新结果），判定为不收敛，停在第 %d 步"
+            % (self._no_progress_steps, step)
+        )
 
     def _tool_context(self, state: SessionState) -> ToolContext:
         """构造工具调用上下文：会话与租户信息由骨架提供，不接受模型参数。
@@ -510,14 +601,24 @@ class AgentLoop:
     def _tool_call_signature(self, tool_calls: list[dict[str, Any]]) -> str:
         """计算一批工具调用的签名，用于识别模型原地打转。
 
+        归一化三件事：解析参数、剔除易变字段、调用按内容排序。
+        这样"键序不同 / 多带一个时间戳 / 调换调用顺序"都不会伪装成新调用。
+
         :param tool_calls: 本步模型请求的工具调用
-        :return: 只含工具名与参数的稳定字符串
+        :return: 只含工具名与稳定参数的字符串
         """
-        return json.dumps(
-            [{"name": _call_name(item), "arguments": _call_arguments(item)} for item in tool_calls],
-            sort_keys=True,
-            ensure_ascii=False,
-        )
+        # 1. 逐调用归一化：参数先解析成结构值，再剔除易变字段
+        items = [
+            {
+                "name": _call_name(item),
+                "arguments": _stable_arguments(_call_arguments(item)),
+            }
+            for item in tool_calls
+        ]
+
+        # 2. 按内容排序：一批调用只是顺序变了，业务上仍是同一批
+        items.sort(key=lambda one: json.dumps(one, sort_keys=True, ensure_ascii=False, default=str))
+        return json.dumps(items, sort_keys=True, ensure_ascii=False, default=str)
 
     def _task_timeout(self) -> bool:
         """任务级超时：与单次调用超时是两回事，必须分开判。"""
@@ -713,6 +814,39 @@ def _normalize_arguments(arguments: Any) -> Any:
         return [_normalize_arguments(item) for item in arguments]
 
     return arguments
+
+
+def _drop_volatile(value: Any) -> Any:
+    """递归剔除易变字段，只作用在字典的键上，值里的业务语义保持原样。
+
+    :param value: 已归一化的参数结构
+    :return: 去掉易变字段后的结构
+    """
+    # 1. 字典：键名统一小写并去掉前缀下划线，命中名单就整项丢弃
+    if isinstance(value, dict):
+        return {
+            key: _drop_volatile(item)
+            for key, item in value.items()
+            if str(key).lower().lstrip("_") not in _VOLATILE_ARG_KEYS
+        }
+
+    # 2. 数组：逐项递归，顺序仍属业务语义不作改动
+    if isinstance(value, list):
+        return [_drop_volatile(item) for item in value]
+
+    return value
+
+
+def _stable_arguments(arguments: Any) -> Any:
+    """供死循环识别用的稳定参数：归一化 + 剔除易变字段。
+
+    WHY 与 _args_fingerprint 分开：后者用于恢复对账，需要保留全部参数便于重算幂等键；
+    前者只回答"这几次调用是不是同一件事"，时间戳之类的字段必须丢掉。
+
+    :param arguments: 模型给出的原始参数
+    :return: 稳定结构
+    """
+    return _drop_volatile(_normalize_arguments(arguments))
 
 
 def _args_fingerprint(arguments: Any) -> str:

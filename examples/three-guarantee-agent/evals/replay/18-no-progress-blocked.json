@@ -1,0 +1,45 @@
+{
+  "input": "在发动机和变速箱之间反复查同一批保修数据",
+  "turns": [
+    {
+      "text": "",
+      "prompt_tokens": 800,
+      "completion_tokens": 30,
+      "tool_calls": [
+        {"id": "c18a", "type": "function", "function": {"name": "query_warranty_period", "arguments": "{\"vin\": \"LSVAA1234R1234567\", \"part_name\": \"发动机\"}"}}
+      ]
+    },
+    {
+      "text": "",
+      "prompt_tokens": 860,
+      "completion_tokens": 30,
+      "tool_calls": [
+        {"id": "c18b", "type": "function", "function": {"name": "query_warranty_period", "arguments": "{\"vin\": \"LSVAA1234R1234567\", \"part_name\": \"变速箱\"}"}}
+      ]
+    },
+    {
+      "text": "",
+      "prompt_tokens": 920,
+      "completion_tokens": 30,
+      "tool_calls": [
+        {"id": "c18c", "type": "function", "function": {"name": "query_warranty_period", "arguments": "{\"vin\": \"LSVAA1234R1234567\", \"part_name\": \"发动机\"}"}}
+      ]
+    },
+    {
+      "text": "",
+      "prompt_tokens": 980,
+      "completion_tokens": 30,
+      "tool_calls": [
+        {"id": "c18d", "type": "function", "function": {"name": "query_warranty_period", "arguments": "{\"vin\": \"LSVAA1234R1234567\", \"part_name\": \"变速箱\"}"}}
+      ]
+    },
+    {
+      "text": "",
+      "prompt_tokens": 1040,
+      "completion_tokens": 30,
+      "tool_calls": [
+        {"id": "c18e", "type": "function", "function": {"name": "query_warranty_period", "arguments": "{\"vin\": \"LSVAA1234R1234567\", \"part_name\": \"发动机\"}"}}
+      ]
+    }
+  ]
+}

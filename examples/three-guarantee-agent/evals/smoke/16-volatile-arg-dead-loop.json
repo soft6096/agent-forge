@@ -1,0 +1,12 @@
+{
+  "id": "16-volatile-arg-dead-loop",
+  "input": "重复查同一个零件的保修期，每次带不同时间戳",
+  "expect": {
+    "reason": "blocked",
+    "max_steps": 3,
+    "tools_used": ["query_warranty_period"],
+    "detail_contains": ["连续 3 步相同工具调用"],
+    "tool_error_codes": ["invalid_argument"]
+  },
+  "note": "易变字段归一化：每步换 request_id 不能把相同调用伪装成新调用，第 3 步即拦截"
+}
