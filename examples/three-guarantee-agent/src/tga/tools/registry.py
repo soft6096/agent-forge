@@ -15,6 +15,7 @@ from dataclasses import replace
 from typing import Any, Iterable
 
 from ..ops.logging import StructuredLogger
+from ..safety.approval import STATUS_CONFIRMED, ApprovalStore, PendingAction
 from ..settings import Settings
 from .contract import (
     SideEffect,
@@ -105,6 +106,15 @@ class ToolRegistry:
                 settings.idempotency.window_s,
             )
             if settings.idempotency.enabled
+            else None
+        )
+        # 高危确认存储：确认项必须先落盘再等人工执行，进程重启也不能丢
+        self._approvals = (
+            ApprovalStore(
+                settings.project_root / "runtime" / "approvals",
+                settings.safety.approval_ttl_s,
+            )
+            if settings.safety.require_approval
             else None
         )
 
@@ -207,16 +217,10 @@ class ToolRegistry:
         if invalid is not None:
             return self._fail(started, invalid)
 
-        # 4. 人工确认：高危工具在确认开关打开时不下发执行，确认流程不在工具侧
-        if spec.side_effect is SideEffect.DANGEROUS and context.require_approval:
-            return self._fail(
-                started,
-                ToolError(
-                    code=ToolErrorCode.APPROVAL_REQUIRED,
-                    message="工具 %s 属高危操作，需人工确认后执行" % spec.name,
-                    hint="把待确认内容整理给售后顾问，确认后再提交；不要自行重试",
-                ),
-            )
+        # 4. 人工确认闸门：未确认就登记待确认项，人工确认过的凭令牌放行
+        gate, approved = self._gate_dangerous(spec, cleaned, context, started)
+        if gate is not None:
+            return gate
 
         # 5. 幂等准入：写类工具先抢幂等键，命中就复用首次结果，不再执行业务
         claim = Claim(status=ClaimStatus.ACQUIRED)
@@ -275,16 +279,88 @@ class ToolRegistry:
                 ),
             )
 
-        # 8. 成功：先提交幂等结果，再把保留键提到 duplicated
+        # 8. 成功：先提交幂等结果，再关闭确认项，最后把保留键提到 duplicated
         duplicated = bool(data.pop("_duplicated", False))
         if call_context.idempotency_key and self._idem is not None:
             self._idem.commit(call_context.idempotency_key, claim.token, data)
+        if approved is not None and self._approvals is not None:
+            self._approvals.close(approved, STATUS_CONFIRMED, data)
         return ToolOutcome(
             ok=True,
             data=data,
             elapsed_ms=int(time.time() * 1000) - started,
             duplicated=duplicated,
         )
+
+    def _gate_dangerous(
+        self,
+        spec: ToolSpec,
+        arguments: dict[str, Any],
+        context: ToolContext,
+        started: int,
+    ) -> tuple[ToolOutcome | None, PendingAction | None]:
+        """高危工具的人工确认闸门。
+
+        :param spec: 工具契约卡，提供副作用等级与工具名
+        :param arguments: 已通过契约校验的参数
+        :param context: 调用上下文，提供人工确认令牌
+        :param started: 调用开始时间戳，用于计算拦截耗时
+        :return: （拦截结果, 已通过的确认项）；拦截结果非空表示不得执行
+        """
+        # 1. 非高危或确认开关关闭：直接放行，不产生任何确认记录
+        if spec.side_effect is not SideEffect.DANGEROUS or self._approvals is None:
+            return None, None
+
+        # 2. 没有令牌：登记待确认项并给出人的下一步，绝不执行
+        if not context.approval_id:
+            action = self._approvals.create(
+                tool_name=spec.name,
+                arguments=arguments,
+                summary=self._summarize(spec, arguments),
+                session_id=context.state.session_id,
+                step_no=context.state.step_no,
+            )
+            return (
+                self._fail(
+                    started,
+                    ToolError(
+                        code=ToolErrorCode.APPROVAL_REQUIRED,
+                        message="工具 %s 属高危操作，已生成待确认项 %s"
+                        % (spec.name, action.action_id),
+                        hint="请售后顾问核对后由人执行：python3 -m tga.confirm --id %s"
+                        "（模型不得自行确认）" % action.action_id,
+                    ),
+                ),
+                None,
+            )
+
+        # 3. 有令牌：校验状态、有效期、工具与参数指纹，任一项不符即拒绝
+        action, reason = self._approvals.verify(context.approval_id, spec.name, arguments)
+        if action is None:
+            return (
+                self._fail(
+                    started,
+                    ToolError(
+                        code=ToolErrorCode.PERMISSION_DENIED,
+                        message="人工确认校验未通过：%s" % reason,
+                        hint="重新发起确认；不要复用旧令牌，也不要改写参数",
+                    ),
+                ),
+                None,
+            )
+
+        # 4. 校验通过：放行执行，成功后由调用方关闭确认项
+        return None, action
+
+    def _summarize(self, spec: ToolSpec, arguments: dict[str, Any]) -> str:
+        """生成给人看的一句话说明，避免顾问去读 JSON。
+
+        :param spec: 工具契约卡
+        :param arguments: 已校验参数
+        :return: 摘要文本，超长截断到 160 字
+        """
+        detail = "，".join("%s=%s" % (key, value) for key, value in arguments.items())
+        return ("%s：%s" % (spec.name, detail))[:160]
 
     def _make_key(self, spec: ToolSpec, arguments: dict[str, Any], context: ToolContext) -> str:
         """按契约声明的业务键字段拼出幂等键。

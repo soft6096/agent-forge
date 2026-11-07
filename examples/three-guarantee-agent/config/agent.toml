@@ -40,8 +40,9 @@ poll_interval_ms = 200             # 取消信号检查间隔
 [safety]
 require_approval = true            # 高危工具人工确认总开关，默认开，关闭需写明理由
 input_filter = true                # 入向过滤（敏感信息 + 注入特征打标）
-output_filter = true               # 出向过滤
+output_filter = true               # 出向过滤（答复脱敏）
 external_content_isolation = true  # 外部内容与指令分离
+approval_ttl_s = 1800              # 待确认项有效期 30 分钟，过期必须重新发起
 
 [eval]
 # 评测默认不执行：主流程不会自动跑评测，只有显式执行 tga.eval.runner 才会跑。

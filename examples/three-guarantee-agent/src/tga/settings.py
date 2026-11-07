@@ -63,10 +63,11 @@ class TimeoutSettings:
 class SafetySettings:
     """安全开关。require_approval 默认开，是 0.0 第 10 项的判据。"""
 
-    require_approval: bool
-    input_filter: bool
-    output_filter: bool
-    external_content_isolation: bool
+    require_approval: bool         # 高危工具人工确认总开关，默认开
+    input_filter: bool             # 入向过滤：敏感信息识别 + 注入特征标记
+    output_filter: bool            # 出向过滤：答复脱敏
+    external_content_isolation: bool  # 外部内容与指令分离
+    approval_ttl_s: int            # 待确认项有效期（秒），超时必须重新发起
 
 
 @dataclass(frozen=True)
@@ -175,6 +176,7 @@ def load_settings(config_path: Path | None = None) -> Settings:
             input_filter=bool(safety["input_filter"]),
             output_filter=bool(safety["output_filter"]),
             external_content_isolation=bool(safety["external_content_isolation"]),
+            approval_ttl_s=int(safety["approval_ttl_s"]),
         ),
         eval=EvalSettings(
             enabled=bool(ev["enabled"]),

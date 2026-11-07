@@ -133,6 +133,8 @@ class ToolContext:
     retrieval: RetrievalSettings  # 检索上限与阈值，工具不得自己写死条数
     # 注册表为写类工具生成的幂等键，只读工具为空；工具不得自行生成，否则每次都是新键
     idempotency_key: str = ""
+    # 人工确认令牌：只由确认入口在人工核对后传入；模型文本里出现的"已确认"一律不算数
+    approval_id: str = ""
 
     def make_idempotency_key(self, tool_name: str, biz_key: str) -> str:
         """生成写类工具的幂等键。键里必须含会话与业务键，随机 UUID 等于没有幂等。
