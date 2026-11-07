@@ -5,11 +5,11 @@
   },
   "agent-core-standards": {
     "load_lines": 301,
-    "load_bytes": 13681
+    "load_bytes": 13819
   },
   "agent-dev-workflow": {
     "load_lines": 334,
-    "load_bytes": 17045
+    "load_bytes": 17351
   },
   "agent-eval-standards": {
     "load_lines": 266,
