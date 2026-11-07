@@ -1,0 +1,12 @@
+{
+  "id": "15-resume-rejects-corrupt-snapshot",
+  "input": "[恢复探针] 损坏快照必须显性报错",
+  "requires_recording": false,
+  "resume_probe": "corrupt",
+  "expect": {
+    "reason": "blocked",
+    "max_steps": 0,
+    "detail_contains": ["快照内容损坏"]
+  },
+  "note": "恢复入口：快照损坏时报错退出，禁止静默新建会话把恢复变成从头重跑"
+}

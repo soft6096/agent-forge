@@ -9,10 +9,12 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import time
 from dataclasses import dataclass
 from enum import Enum
+from pathlib import Path
 from typing import Any
 
 from .context.budget import estimate_tokens
@@ -27,7 +29,13 @@ from .safety.filters import (
     wrap_external,
 )
 from .settings import Settings
-from .state import SessionState
+from .state import (
+    RESUMABLE_STATUSES,
+    SessionState,
+    SessionStatus,
+    SnapshotError,
+    prune_snapshots,
+)
 from .tools.contract import ToolContext, ToolOutcome
 from .tools.registry import ToolRegistry
 
@@ -114,7 +122,7 @@ class AgentLoop:
     # ---------- 主流程 ----------
 
     def run(self, user_input: str) -> TaskResult:
-        """跑一次任务。每步开始检查终止条件，不允许在步中间 return。"""
+        """跑一次新任务。每步开始检查终止条件，不允许在步中间 return。"""
         state = SessionState.new(user_input)
         # 日志必须在第一条记录之前拿到真实 session_id，否则整轮日志无法与会话对齐
         self._log.session_id = state.session_id
@@ -122,8 +130,74 @@ class AgentLoop:
         state.add_message("system", self._s.prompt_text)
         # 入向过滤：敏感信息与注入特征先过一遍，再进上下文
         state.add_message("user", self._screen_input(user_input))
+        return self._drive(state, start_step=1)
 
-        for step in range(1, self._s.budget.max_steps + 1):
+    def run_resume(self, session_id: str) -> TaskResult:
+        """从快照续跑：从最后一步的下一步继续，不重跑已完成工具（core 03 §3）。
+
+        :param session_id: 要恢复的会话 id
+        :return: 续跑后的任务结果
+        :raises SnapshotError: 快照缺失、损坏、版本不兼容、已过期或当前状态不可续跑
+        """
+        # 1. 读快照：读不到必须显性失败，绝不静默新建会话把"恢复"变成"从头重跑"
+        path = self._session_path(session_id)
+        state = SessionState.load(path)
+
+        # 2. 状态判定：已完成 / 已拦截的会话不续跑，硬接等于重放已完成的工作
+        if not state.is_resumable():
+            raise SnapshotError(
+                "会话 %s 当前状态为 %s，不属于可恢复状态（%s）"
+                % (session_id, state.status, " / ".join(RESUMABLE_STATUSES))
+            )
+
+        # 3. 过期判定：超过保留期只能新开会话，否则用户会以为上下文还在
+        if self._snapshot_expired(path):
+            raise SnapshotError(
+                "会话 %s 的快照已超过 %d 小时，请新开会话"
+                % (session_id, self._s.session.snapshot_ttl_h)
+            )
+
+        # 4. 接管：日志与预算都接着原会话走，否则续跑等于预算清零重来
+        self._log.session_id = state.session_id
+        self._budget.restore(state.usage)
+        state.status = SessionStatus.RUNNING.value
+
+        # 5. 恢复对账：把上一步执行到一半的工具调用标出来，避免续跑重复副作用
+        self._reconcile(state)
+
+        # 6. 从下一步继续：step_no 是最后完成的步，重跑它等于重复执行工具
+        return self._drive(state, start_step=state.step_no + 1)
+
+    def _drive(self, state: SessionState, start_step: int) -> TaskResult:
+        """驱动主循环。新任务与恢复共用这一段，差别只在起始步与已存在的状态。
+
+        :param state: 会话状态（新建或从快照恢复）
+        :param start_step: 起始步序号，恢复时是最后完成步 + 1
+        :return: 任务结果
+        """
+        # 恢复后已无剩余步数：直接按步数耗尽收口，不进循环空转
+        if start_step > self._s.budget.max_steps:
+            return self._terminate(
+                TermReason.STEP_EXHAUSTED,
+                state,
+                "恢复后已无剩余步数（上限 %d），请新开会话" % self._s.budget.max_steps,
+            )
+
+        # 过期快照在本轮开跑前清一次：不清理会让 sessions 目录无限增长
+        archived = prune_snapshots(
+            self._s.project_root / "runtime" / "sessions",
+            self._s.session.snapshot_ttl_h * 3600,
+        )
+        if archived:
+            self._log.log(
+                step_no=state.step_no,
+                tool_name="session_prune",
+                result_code="archived",
+                event="session_prune",
+                extra={"count": len(archived)},
+            )
+
+        for step in range(start_step, self._s.budget.max_steps + 1):
             state.step_no = step
 
             # 终止条件检查点：中断 → 预算 → 任务超时（三类都在调模型之前判）
@@ -190,15 +264,15 @@ class AgentLoop:
                 halted = self._handle_tool_calls(resp.tool_calls, state, step)
                 if halted is not None:
                     return halted
+                # 步末落快照：只在终止时落盘的话，进程被杀会丢掉最后一步（core 03 §3）
+                self._snapshot(state)
                 continue
 
             # 无工具调用即视为给出最终答案，出向过滤后再交付
-            state.status = "completed"
             return self._terminate(
                 TermReason.COMPLETED, state, self._screen_output(resp.text, step)
             )
 
-        state.status = "step_exhausted"
         return self._terminate(
             TermReason.STEP_EXHAUSTED,
             state,
@@ -270,7 +344,6 @@ class AgentLoop:
         signature = self._tool_call_signature(tool_calls)
         self._recent_tool_signatures.append(signature)
         if self._recent_tool_signatures[-3:] == [signature] * 3:
-            state.status = "blocked"
             return self._terminate(
                 TermReason.BLOCKED,
                 state,
@@ -279,7 +352,6 @@ class AgentLoop:
 
         # 2. 装配兜底：没注入注册表却出现工具调用，属接线错误，必须显性失败而不是忽略
         if self._tools is None:
-            state.status = "blocked"
             return self._terminate(
                 TermReason.BLOCKED,
                 state,
@@ -290,7 +362,15 @@ class AgentLoop:
         context = self._tool_context(state)
         for call in tool_calls:
             name = _call_name(call)
-            outcome = self._invoke_with_retry(name, _call_arguments(call), context, step)
+            arguments = _call_arguments(call)
+            # WHY 先记调用再执行：进程在工具执行中途被杀时，"调用过但没有结果"这个事实
+            # 必须已经落在快照里，否则恢复后无法判断上次到底写没写成
+            record = state.record_tool_call(
+                name, _args_fingerprint(arguments), step, raw_arguments=arguments
+            )
+            outcome = self._invoke_with_retry(name, arguments, context, step)
+            # 执行完补结果摘要：空摘要即"执行中被打断"，恢复对账据此判定
+            record["result_digest"] = _result_digest(outcome)
 
             # 4. 回填：tool 消息必须带 tool_call_id 与 name，模型才知道结果属于哪个调用
             content = outcome.to_message_content()
@@ -443,11 +523,120 @@ class AgentLoop:
         """任务级超时：与单次调用超时是两回事，必须分开判。"""
         return int(time.time() * 1000) > self._deadline_ms
 
+    # ---------- 快照与恢复 ----------
+
+    def _session_path(self, session_id: str) -> Path:
+        """快照文件路径：一个会话一个文件，文件名即 session_id。"""
+        return self._s.project_root / "runtime" / "sessions" / ("%s.json" % session_id)
+
+    def _snapshot(self, state: SessionState) -> None:
+        """落一次快照。调用方负责在步边界调用（core 03 §3）。"""
+        # 用量先同步进状态：恢复后要接着判预算，快照里没有用量等于把预算清零
+        state.usage = self._budget.snapshot()
+        state.save(self._session_path(state.session_id))
+
+    def _snapshot_expired(self, path: Path) -> bool:
+        """快照是否已过期。取不到 mtime 时按未过期处理，宁可多给一次机会。"""
+        try:
+            mtime = path.stat().st_mtime
+        except OSError:
+            return False
+        return (time.time() - mtime) > self._s.session.snapshot_ttl_h * 3600
+
+    def _reconcile(self, state: SessionState) -> None:
+        """恢复对账：确认上次被打断的工具调用是否已落库（core 03 §3）。
+
+        :param state: 从快照恢复出来的会话状态，就地补写 tool_records 的结果摘要
+        """
+        pending = state.unfinished_tool_calls()
+        if not pending:
+            return
+
+        # 1. 逐条查幂等存储：已落库的补上结果摘要，未落库的收集起来告知模型
+        unresolved: list[str] = []
+        for record in pending:
+            digest = self._lookup_written(record, state)
+            if digest is not None:
+                record["result_digest"] = digest
+                continue
+            unresolved.append(str(record.get("name") or "unknown"))
+
+        # 2. 回填事实：让模型知道"上次这条调用结果未知"，而不是假装没发生过
+        if unresolved:
+            state.add_message(
+                "system",
+                "[恢复提示] 上次会话在工具执行途中被打断，以下调用的结果未知：%s。"
+                "如需精确结论请重新查询；写类操作重复提交会由幂等键去重。"
+                % "、".join(sorted(set(unresolved))),
+            )
+
+        # 3. 留痕：恢复对账是审计事件，必须可回溯到会话与步序号
+        self._log.log(
+            step_no=state.step_no,
+            tool_name="reconcile",
+            result_code="ok" if not unresolved else "unresolved",
+            event="session_resume",
+            extra={
+                "session_id": state.session_id,
+                "unfinished": len(pending),
+                "unresolved": len(unresolved),
+            },
+        )
+
+    def _lookup_written(
+        self, record: dict[str, Any], state: SessionState
+    ) -> str | None:
+        """查这条调用是否已在幂等存储里落库，是则返回结果摘要。
+
+        :param record: tool_records 里的一条记录，含工具名与原始参数
+        :param state: 当前会话状态，用于重算幂等键
+        :return: 首次结果的摘要；未落库、无法重算键或没有注册表时返回 None
+        """
+        # 1. 没有注册表就没有幂等存储可查，只能按"未落库"处理
+        if self._tools is None:
+            return None
+
+        # 2. 工具名或参数缺失时无法重算幂等键
+        name = str(record.get("name") or "")
+        raw = record.get("arguments")
+        if not name or raw is None:
+            return None
+
+        # 3. 解析参数：模型原始参数通常是 JSON 字符串，解析失败说明记录本身坏了
+        if isinstance(raw, str):
+            try:
+                arguments = json.loads(raw)
+            except json.JSONDecodeError:
+                return None
+        elif isinstance(raw, dict):
+            arguments = raw
+        else:
+            return None
+
+        # 4. 只读查询：不抢占、不改幂等状态；命中则用首次结果摘要作为本次结果
+        hit = self._tools.lookup_idempotent(name, arguments, self._tool_context(state))
+        if hit is None:
+            return None
+        return hashlib.sha1(
+            json.dumps(hit, sort_keys=True, ensure_ascii=False, default=str).encode("utf-8")
+        ).hexdigest()[:16]
+
+    # 终止原因到状态的映射：放一张表统一赋值，避免各分支各自赋值时漏掉某一个（core 01 §4）
+    _STATUS_BY_REASON = {
+        TermReason.COMPLETED: SessionStatus.COMPLETED,
+        TermReason.STEP_EXHAUSTED: SessionStatus.STEP_EXHAUSTED,
+        TermReason.BUDGET_EXCEEDED: SessionStatus.BUDGET_EXCEEDED,
+        TermReason.CANCELLED: SessionStatus.CANCELLED,
+        TermReason.BLOCKED: SessionStatus.BLOCKED,
+    }
+
     def _terminate(self, reason: TermReason, state: SessionState, detail: str) -> TaskResult:
-        """统一出口：落状态快照、写收尾日志、返回带用量的结果。"""
+        """统一出口：写状态、落状态快照、写收尾日志、返回带用量的结果。"""
+        # 状态在这里统一赋值：任何终止分支都走这里，不存在"忘了设 status"的漏网
+        state.status = self._STATUS_BY_REASON[reason].value
         span = self._log.child_span("finalize")
         # 先落快照再写收尾日志：日志里的 elapsed_ms 就是落盘真实耗时，不是占位 0
-        state.save(self._s.project_root / "runtime" / "sessions" / ("%s.json" % state.session_id))
+        self._snapshot(state)
         span.finish("ok")
         self._log.log(
             step_no=state.step_no,
@@ -497,3 +686,43 @@ def _call_arguments(call: dict[str, Any]) -> str | dict[str, Any] | None:
 
     # 2. 退回扁平结构
     return call.get("arguments")
+
+
+def _normalize_arguments(arguments: Any) -> Any:
+    """把参数归一化成稳定结构，供指纹计算。
+
+    WHY: 模型每次可能把同样的参数序列化成不同的 JSON 文本（键序、空白不同），
+    直接对原始字符串做哈希等于每次都是新指纹，死循环识别与恢复对账都会失效。
+
+    :param arguments: 原始参数，可能是 JSON 字符串、字典或其它类型
+    :return: 键有序、结构稳定的值；无法解析的字符串按去空白后的原文处理
+    """
+    # 1. 字符串先尝试解析成 JSON，解析不了就退化为去空白原文
+    if isinstance(arguments, str):
+        try:
+            return _normalize_arguments(json.loads(arguments))
+        except json.JSONDecodeError:
+            return arguments.strip()
+
+    # 2. 字典按键排序后递归归一，键序不同的等价参数得到同一指纹
+    if isinstance(arguments, dict):
+        return {str(key): _normalize_arguments(value) for key, value in sorted(arguments.items())}
+
+    # 3. 列表保持顺序递归归一：顺序在数组里是语义的一部分
+    if isinstance(arguments, list):
+        return [_normalize_arguments(item) for item in arguments]
+
+    return arguments
+
+
+def _args_fingerprint(arguments: Any) -> str:
+    """参数指纹：归一化后取哈希，用于死循环识别与恢复对账。"""
+    normalized = _normalize_arguments(arguments)
+    return hashlib.sha1(
+        json.dumps(normalized, sort_keys=True, ensure_ascii=False, default=str).encode("utf-8")
+    ).hexdigest()[:16]
+
+
+def _result_digest(outcome: ToolOutcome) -> str:
+    """工具结果摘要：有摘要即"执行完成"，空摘要即"执行中被打断"。"""
+    return hashlib.sha1(outcome.to_message_content().encode("utf-8")).hexdigest()[:16]

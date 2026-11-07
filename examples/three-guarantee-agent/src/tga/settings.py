@@ -138,6 +138,13 @@ class IdempotencySettings:
 
 
 @dataclass(frozen=True)
+class SessionSettings:
+    """会话快照配置。过期时间必须可配，写死在代码里等于没有生命周期管理。"""
+
+    snapshot_ttl_h: int = 24   # 快照保留时长（小时），超过只能新开会话
+
+
+@dataclass(frozen=True)
 class Settings:
     """聚合配置。全部字段只读，运行时不允许被改写。"""
 
@@ -153,6 +160,8 @@ class Settings:
     idempotency: IdempotencySettings
     context: ContextSettings
     project_root: Path
+    # 会话快照配置：放在最后并给默认值，避免老配置文件缺这一节时直接崩
+    session: SessionSettings = SessionSettings()
 
     @property
     def prompt_text(self) -> str:
@@ -188,6 +197,8 @@ def load_settings(config_path: Path | None = None) -> Settings:
     retrieval = data["retrieval"]
     idem = data["idempotency"]
     ctx = data["context"]
+    # 会话快照配置允许缺省：老配置文件没有这一节时按默认 24 小时处理，不能因此起不来
+    sess = data.get("session") or {}
 
     # 预算表在装配期校验：加总超窗口或输出预留不足，启动就失败，不留到运行期撞墙
     context = ContextSettings(
@@ -250,4 +261,5 @@ def load_settings(config_path: Path | None = None) -> Settings:
         ),
         context=context,
         project_root=PROJECT_ROOT,
+        session=SessionSettings(snapshot_ttl_h=int(sess.get("snapshot_ttl_h") or 24)),
     )

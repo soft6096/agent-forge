@@ -29,6 +29,9 @@ enabled = true                     # 关闭后写类工具失去重复保护，�
 dir = "runtime/idempotency"        # 幂等键与结果落盘目录，不进版本库
 window_s = 7200                    # 去重窗口 2 小时，远大于单任务 120s，留足重试余量
 
+[session]
+snapshot_ttl_h = 24                # 快照保留 24 小时，超过只能新开会话；过期快照归档到 sessions/archive
+
 [context]
 # 五段预算加总必须 ≤ window_tokens × 0.95，缺一段就等于给某类内容开无限额度。
 # 单轮任务把额度让给检索与输出预留，历史只留滑窗与摘要。

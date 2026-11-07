@@ -144,6 +144,30 @@ class ToolRegistry:
         """
         return self._specs.get(name)
 
+    def lookup_idempotent(
+        self, name: str, arguments: dict[str, Any], context: ToolContext
+    ) -> dict[str, Any] | None:
+        """只读查询某次写类调用是否已落库，供会话恢复对账使用。
+
+        WHY 单独开一个只读入口：恢复对账不能走 invoke——那会真的执行工具，
+        把"检查有没有执行过"变成"再执行一次"。
+
+        :param name: 工具名
+        :param arguments: 模型给的原始参数，这里只取幂等键字段，不做完整校验
+        :param context: 调用上下文，提供会话 id
+        :return: 首次执行结果；只读工具、未落库或幂等未启用时返回 None
+        """
+        # 1. 只有写类工具才有幂等记录，只读工具直接跳过
+        spec = self._specs.get(name)
+        if spec is None or not spec.is_write or self._idem is None:
+            return None
+
+        # 2. 参数不校验也能算键：键只取声明的业务键字段，多余参数不参与
+        key = self._make_key(spec, arguments, context)
+
+        # 3. 只读查询，不抢占、不释放占位
+        return self._idem.lookup(key)
+
     def names(self) -> list[str]:
         """列出已登记的工具名，用于错误提示里给模型可用清单。
 

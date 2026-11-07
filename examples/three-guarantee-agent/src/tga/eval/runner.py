@@ -13,6 +13,7 @@ import io
 import json
 import sys
 from dataclasses import dataclass, field, replace
+from pathlib import Path
 from typing import Any
 
 from ..llm import ReplayProvider
@@ -21,7 +22,7 @@ from ..ops.logging import StructuredLogger
 from ..safety.approval import ApprovalStore
 from ..safety.filters import strip_external
 from ..settings import Settings, load_settings
-from ..state import SessionState
+from ..state import SessionState, SessionStatus, SnapshotError
 from ..tools.builtin import build_registry
 from ..tools.contract import ToolContext
 from .cases import Case, load_cases
@@ -43,6 +44,7 @@ class CaseResult:
     note: str = ""       # 用例覆盖说明
     detail: str = ""     # 终止说明，非 completed 分支的失败只能从这里看
     approvals: list[dict[str, Any]] = field(default_factory=list)  # 模拟人工确认的执行结果
+    probe: str = ""      # 恢复探针类型，非探针用例为空
 
 
 def run_case(case: Case, settings: Settings) -> CaseResult:
@@ -54,6 +56,10 @@ def run_case(case: Case, settings: Settings) -> CaseResult:
     """
     # 1. 用例级配置覆盖：极端场景只对这条用例成立，不改全局配置
     settings = _with_override(settings, case)
+
+    # 1.5 恢复探针：不调模型，只验证恢复入口对坏快照的拒绝语义
+    if case.resume_probe:
+        return _run_resume_probe(case, settings)
 
     # 2. 每条用例独立 Provider：录制游标必须隔离，否则用例之间互相偷轮次
     provider = ReplayProvider(settings.project_root / "evals" / "replay")
@@ -73,6 +79,8 @@ def run_case(case: Case, settings: Settings) -> CaseResult:
     result = loop.run(case.input_text)
     approvals = _confirm_pending(case, result, settings, logger)
     failures = _judge(case, result, approvals)
+    # 快照事实单独判：终止原因对不代表落盘对，中断恢复依赖的正是这份文件
+    failures.extend(_judge_snapshot(case, result, settings))
 
     return CaseResult(
         case_id=case.case_id,
@@ -88,6 +96,145 @@ def run_case(case: Case, settings: Settings) -> CaseResult:
         detail=result.detail,
         approvals=approvals,
     )
+
+
+def _run_resume_probe(case: Case, settings: Settings) -> CaseResult:
+    """恢复探针：构造坏快照，确认 run_resume 显性报错而不是静默新建会话。
+
+    WHY 单独一条通道：这类行为不产生模型调用，用"跑一次任务"的框架去测会逼着造录制，
+    而它验证的恰恰是"没有模型也能正确拒绝"。
+
+    :param case: 用例，resume_probe 指明构造哪种坏快照
+    :param settings: 运行配置，提供项目根与快照目录
+    :return: 判定结果；通过表示恢复入口拒绝了这个快照且给出了可读原因
+    """
+    # 1. 装配主循环：Provider 只是构造参数，探针在读到坏快照时就返回了，不会真的调模型
+    logger = StructuredLogger(session_id="eval-" + case.case_id, stream=io.StringIO())
+    registry = build_registry(settings, logger=logger)
+    loop = AgentLoop(
+        settings=settings,
+        provider=ReplayProvider(settings.project_root / "evals" / "replay"),
+        logger=logger,
+        tools=registry,
+    )
+
+    # 2. 造快照：先清掉同名残留，否则上一次探针的文件会让本次结论失真
+    session_id = "probe-" + case.case_id
+    path = settings.project_root / "runtime" / "sessions" / ("%s.json" % session_id)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.unlink(missing_ok=True)
+    _build_bad_snapshot(case.resume_probe or "", path, session_id)
+
+    # 3. 调恢复入口：期望抛 SnapshotError
+    failures: list[str] = []
+    error = ""
+    try:
+        loop.run_resume(session_id)
+        failures.append(
+            "恢复入口未拒绝 %s 快照：用户会以为在续跑，实际从头重跑" % case.resume_probe
+        )
+    except SnapshotError as exc:
+        error = str(exc)
+    except Exception as exc:  # noqa: BLE001 - 探针要区分"没报错"与"报了别的错"
+        failures.append(
+            "恢复入口抛出了非 SnapshotError 异常：%s: %s" % (type(exc).__name__, exc)
+        )
+
+    # 4. 清理：探针造的文件不留痕，避免污染会话目录与后续判定
+    path.unlink(missing_ok=True)
+
+    # 5. 错误信息必须能说清原因：只抛空消息等于让用户自己猜
+    for token in case.expect.detail_contains:
+        if token not in error:
+            failures.append("恢复错误信息缺少 %r（实际 %r）" % (token, error))
+
+    return CaseResult(
+        case_id=case.case_id,
+        passed=not failures,
+        failures=failures,
+        reason="blocked" if error else "completed",
+        steps=0,
+        answer="",
+        input_text=case.input_text,
+        note=case.note,
+        detail=error,
+        probe=case.resume_probe or "",
+    )
+
+
+def _build_bad_snapshot(probe: str, path: Path, session_id: str) -> None:
+    """按探针类型造一份"应该被拒绝"的快照。
+
+    :param probe: 探针类型，取值 missing / corrupt / future_version / completed
+    :param path: 快照文件路径
+    :param session_id: 会话 id
+    """
+    # 1. missing：什么都不写，验证"没有快照时不许静默新建会话"
+    if probe == "missing":
+        return
+
+    # 2. corrupt：半截或非 JSON 内容，模拟写到一半被 kill
+    if probe == "corrupt":
+        path.write_text("{ 这不是合法 JSON", encoding="utf-8")
+        return
+
+    # 3. future_version：版本高于当前程序，验证"不硬读新版本快照"
+    if probe == "future_version":
+        payload = {
+            "session_id": session_id,
+            "user_input": "probe",
+            "schema_version": 999,
+            "status": SessionStatus.CANCELLED.value,
+        }
+        path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+        return
+
+    # 4. completed：合法快照但状态不可续跑，验证"已完成的不许重放"
+    state = SessionState(session_id=session_id, user_input="probe")
+    state.status = SessionStatus.COMPLETED.value
+    state.save(path)
+
+
+def _judge_snapshot(case: Case, result: TaskResult, settings: Settings) -> list[str]:
+    """核对落盘快照是不是期望的事实。
+
+    :param case: 用例，snapshot_expect 为 None 时跳过
+    :param result: 主循环结果，提供会话 id
+    :param settings: 运行配置，提供项目根
+    :return: 失败项列表，空表示快照事实全部命中
+    """
+    expect = case.snapshot_expect
+    if not expect:
+        return []
+
+    # 1. 读快照：读不出来说明落盘本身有问题，直接判失败
+    path = settings.project_root / "runtime" / "sessions" / ("%s.json" % result.session.session_id)
+    try:
+        state = SessionState.load(path)
+    except SnapshotError as exc:
+        return ["快照不可读：%s" % exc]
+
+    failures: list[str] = []
+
+    # 2. 状态与可恢复性：中断后必须能区分"已取消待恢复"和"还在跑"
+    if state.status != str(expect["status"]):
+        failures.append("快照 status 期望 %s 实际 %s" % (expect["status"], state.status))
+    if "resumable" in expect and state.is_resumable() != bool(expect["resumable"]):
+        failures.append(
+            "快照可恢复性期望 %s 实际 %s" % (bool(expect["resumable"]), state.is_resumable())
+        )
+
+    # 3. 步序号：恢复从 step_no + 1 起跑，记录错位会重跑已完成的步
+    if state.step_no < int(expect.get("min_step", 0)):
+        failures.append("快照步序号期望 >= %s 实际 %s" % (expect["min_step"], state.step_no))
+
+    # 4. 关键字段：缺 trace_id 或用量，恢复后日志与预算都对不上
+    if not state.trace_id:
+        failures.append("快照缺少 trace_id，恢复后日志无法串联")
+    if "usage" not in state.to_dict():
+        failures.append("快照缺少 usage 字段，恢复后预算会清零重来")
+
+    return failures
 
 
 def _with_override(settings: Settings, case: Case) -> Settings:

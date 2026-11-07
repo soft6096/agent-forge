@@ -45,6 +45,11 @@ class Case:
     context_override: dict[str, float] | None = None
     requires_recording: bool = True   # 是否需要 replay 录制；纯终止分支用例可以不录
     confirm_pending: bool = False     # 跑完后是否模拟人工确认，验证高危操作的开闸通道
+    # 快照期望：跑完后核对落盘快照的 status / resumable / min_step，验证中断恢复的落盘事实
+    snapshot_expect: dict[str, Any] | None = None
+    # 恢复探针：不调模型，直接构造坏快照验证 run_resume 的拒绝语义，
+    # 取值 missing / corrupt / future_version / completed，None 表示不是探针用例
+    resume_probe: str | None = None
 
 
 def load_cases(suite_dir: Path, only: str | None = None) -> list[Case]:
@@ -138,7 +143,57 @@ def _parse_case(path: Path) -> Case:
         context_override=_parse_context_override(case_id, data.get("context_override")),
         requires_recording=bool(data.get("requires_recording", True)),
         confirm_pending=bool(data.get("confirm_pending", False)),
+        snapshot_expect=_parse_snapshot_expect(case_id, data.get("snapshot_expect")),
+        resume_probe=_parse_resume_probe(case_id, data.get("resume_probe")),
     )
+
+
+def _parse_snapshot_expect(case_id: str, raw: Any) -> dict[str, Any] | None:
+    """解析快照期望段，键名在加载期就校验。
+
+    WHY 加载期校验：键名写错若静默忽略，用例会跑在"没有期望"的状态下恒绿，
+    等于给自己发一张假的通过证明。
+
+    :param case_id: 用例 id，用于报错定位
+    :param raw: JSON 里的 snapshot_expect 段，可为 None
+    :return: 期望字典；缺省返回 None
+    :raises ValueError: 不是对象或含未知键时抛出
+    """
+    if raw is None:
+        return None
+    if not isinstance(raw, dict):
+        raise ValueError("用例 %s 的 snapshot_expect 必须是对象" % case_id)
+
+    allowed = {"status", "resumable", "min_step"}
+    unknown = sorted(set(raw) - allowed)
+    if unknown:
+        raise ValueError(
+            "用例 %s 的 snapshot_expect 含未知字段 %s（可用：%s）"
+            % (case_id, "、".join(unknown), " / ".join(sorted(allowed)))
+        )
+    if "status" not in raw:
+        raise ValueError("用例 %s 的 snapshot_expect 缺少 status" % case_id)
+    return dict(raw)
+
+
+def _parse_resume_probe(case_id: str, raw: Any) -> str | None:
+    """解析恢复探针类型，取值必须是已知的几种坏快照构造方式。
+
+    :param case_id: 用例 id，用于报错定位
+    :param raw: JSON 里的 resume_probe 字段，可为 None
+    :return: 探针类型；缺省返回 None
+    :raises ValueError: 取值不在允许集合内
+    """
+    if raw is None:
+        return None
+    value = str(raw)
+    allowed = {"missing", "corrupt", "future_version", "completed"}
+    if value not in allowed:
+        raise ValueError(
+            "用例 %s 的 resume_probe %r 非法（可用：%s）"
+            % (case_id, value, " / ".join(sorted(allowed)))
+        )
+    return value
 
 
 def _parse_context_override(case_id: str, raw: Any) -> dict[str, float] | None:

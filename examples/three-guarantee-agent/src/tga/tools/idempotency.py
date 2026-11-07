@@ -132,6 +132,28 @@ class FileIdempotencyStore:
         if record is not None and record.get("owner") == token:
             path.unlink(missing_ok=True)
 
+    def lookup(self, key: str) -> dict[str, Any] | None:
+        """只读查询窗口内的首次执行结果，不抢占、不改任何状态。
+
+        WHY 会话恢复必须先查后跑：上一轮可能已经把结果落了库，再执行一次虽然有幂等挡住，
+        但对写类工具来说"多一次副作用尝试"本身就是不该冒的风险。
+
+        :param key: 幂等键
+        :return: 首次执行结果；无记录、未完成或已过窗口时返回 None
+        """
+        # 1. 读记录：文件不存在或损坏都按"没有记录"处理，与 claim 的口径一致
+        record = self._read(self._path(key))
+        if record is None or record.get("state") != "done":
+            return None
+
+        # 2. 窗口校验：过期的记录已经允许重放，不能当成"已落库"
+        if int(time.time()) - int(record.get("created_at") or 0) > self._window_s:
+            return None
+
+        # 3. 结果归一：不是字典说明记录被写坏，按空结果返回而不是抛错
+        result = record.get("result")
+        return result if isinstance(result, dict) else {}
+
     def purge(self) -> int:
         """删除窗口外的已完成记录与僵死占位。
 

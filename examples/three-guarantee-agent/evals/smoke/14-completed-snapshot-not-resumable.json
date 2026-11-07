@@ -1,0 +1,12 @@
+{
+  "id": "14-completed-snapshot-not-resumable",
+  "input": "[恢复探针] 已完成会话不允许续跑",
+  "requires_recording": false,
+  "resume_probe": "completed",
+  "expect": {
+    "reason": "blocked",
+    "max_steps": 0,
+    "detail_contains": ["不属于可恢复状态"]
+  },
+  "note": "恢复入口：已完成会话续跑等于重放已完成的工作，必须显性拒绝"
+}

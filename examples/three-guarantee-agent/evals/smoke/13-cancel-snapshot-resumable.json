@@ -1,0 +1,17 @@
+{
+  "id": "13-cancel-snapshot-resumable",
+  "input": "判定这辆车是否在保",
+  "cancel_before_run": true,
+  "requires_recording": false,
+  "expect": {
+    "reason": "cancelled",
+    "max_steps": 1,
+    "detail_contains": ["已保留会话快照"]
+  },
+  "snapshot_expect": {
+    "status": "cancelled",
+    "resumable": true,
+    "min_step": 1
+  },
+  "note": "中断恢复：取消后快照必须标记 cancelled 且可续跑，不能留成 running 让恢复入口无法判断"
+}

@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 
 from ..settings import BudgetSettings
 
@@ -36,6 +37,23 @@ class Budget:
 
     def record(self, prompt_tokens: int, completion_tokens: int) -> None:
         """每次模型调用后必须调用一次，数据来自 API 返回而非本地估算。"""
+        self.usage.add(prompt_tokens, completion_tokens)
+
+    def restore(self, usage: dict[str, Any]) -> None:
+        """恢复累计用量：续跑必须接着原会话计数，否则预算等于清零重来。
+
+        :param usage: 快照里的 usage 字典；字段缺失或类型不对时按 0 处理
+        """
+        # 1. 快照可能来自老版本，usage 不是字典时直接忽略，不能让恢复因为计量字段失败
+        if not isinstance(usage, dict):
+            return
+
+        # 2. 逐项取整：JSON 里可能是字符串或浮点，统一转换后再累加
+        try:
+            prompt_tokens = int(usage.get("prompt_tokens") or 0)
+            completion_tokens = int(usage.get("completion_tokens") or 0)
+        except (TypeError, ValueError):
+            return
         self.usage.add(prompt_tokens, completion_tokens)
 
     @property
