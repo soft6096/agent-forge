@@ -234,6 +234,17 @@ def _judge_snapshot(case: Case, result: TaskResult, settings: Settings) -> list[
     if "usage" not in state.to_dict():
         failures.append("快照缺少 usage 字段，恢复后预算会清零重来")
 
+    # 5. 骨架检测状态：五个维度必须都落盘，恢复后才不会把历史打转记录清零
+    keys = expect.get("detection_keys")
+    if keys:
+        if not isinstance(keys, list):
+            failures.append("detection_keys 期望是列表，实际是 %s" % type(keys).__name__)
+        else:
+            detection = state.detection if isinstance(state.detection, dict) else {}
+            missing = [str(key) for key in keys if str(key) not in detection]
+            if missing:
+                failures.append("快照 detection 缺少字段：%s" % "、".join(missing))
+
     return failures
 
 

@@ -1,0 +1,21 @@
+{
+  "id": "19-detection-state-in-snapshot",
+  "input": "一直查同一个零件的保修期",
+  "expect": {
+    "reason": "blocked",
+    "max_steps": 3
+  },
+  "snapshot_expect": {
+    "status": "blocked",
+    "resumable": false,
+    "min_step": 3,
+    "detection_keys": [
+      "recent_tool_signatures",
+      "tool_failures",
+      "seen_tool_names",
+      "seen_result_digests",
+      "no_progress_steps"
+    ]
+  },
+  "note": "骨架检测状态必须随快照落盘：恢复后死循环识别、熔断与无进展判定不能从零开始"
+}

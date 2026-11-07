@@ -83,6 +83,7 @@ class TaskResult:
             "halted_at": self.halted_at,
             "detail": self.detail,
             "session_id": self.session.session_id,
+            "trace_id": self.session.trace_id,
             "status": self.session.status,
         }
 
@@ -142,8 +143,10 @@ class AgentLoop:
     def run(self, user_input: str) -> TaskResult:
         """跑一次新任务。每步开始检查终止条件，不允许在步中间 return。"""
         state = SessionState.new(user_input)
-        # 日志必须在第一条记录之前拿到真实 session_id，否则整轮日志无法与会话对齐
+        # 日志必须在第一条记录之前拿到真实 session_id 与 trace_id，
+        # 否则 logger 会自己另造一个 trace，快照与日志对不上，恢复后无法串联
         self._log.session_id = state.session_id
+        self._log.trace_id = state.trace_id
         # system 必须排在 user 之前，顺序错了模型会当作用户中途插入的指令
         state.add_message("system", self._s.prompt_text)
         # 入向过滤：敏感信息与注入特征先过一遍，再进上下文
@@ -175,9 +178,12 @@ class AgentLoop:
                 % (session_id, self._s.session.snapshot_ttl_h)
             )
 
-        # 4. 接管：日志与预算都接着原会话走，否则续跑等于预算清零重来
+        # 4. 接管：日志、trace、预算与骨架检测状态都接着原会话走，
+        #    少了任一项，续跑都会变成"看起来是同一个会话、实际各算各的"
         self._log.session_id = state.session_id
+        self._log.trace_id = state.trace_id
         self._budget.restore(state.usage)
+        self._restore_detection(state.detection)
         state.status = SessionStatus.RUNNING.value
 
         # 5. 恢复对账：把上一步执行到一半的工具调用标出来，避免续跑重复副作用
@@ -634,7 +640,61 @@ class AgentLoop:
         """落一次快照。调用方负责在步边界调用（core 03 §3）。"""
         # 用量先同步进状态：恢复后要接着判预算，快照里没有用量等于把预算清零
         state.usage = self._budget.snapshot()
+        # 检测状态同步落盘：恢复后死循环识别、熔断、无进展判定要接着上一轮继续
+        state.detection = self._detection_snapshot()
         state.save(self._session_path(state.session_id))
+
+    def _detection_snapshot(self) -> dict[str, Any]:
+        """导出骨架检测状态，供快照落盘（core 03 §1：会话事实必须可序列化）。
+
+        :return: 五个检测维度的可序列化副本
+        """
+        # 集合转有序列表：JSON 没有集合类型，排序后也方便人读快照做比对
+        return {
+            "recent_tool_signatures": list(self._recent_tool_signatures),
+            "tool_failures": dict(self._tool_failures),
+            "seen_tool_names": sorted(self._seen_tool_names),
+            "seen_result_digests": sorted(self._seen_result_digests),
+            "no_progress_steps": self._no_progress_steps,
+        }
+
+    def _restore_detection(self, data: Any) -> None:
+        """从快照还原骨架检测状态（core 03 §3：恢复不能丢已执行事实）。
+
+        WHY 逐字段校验类型：快照可能来自旧版本或被手工改过，一个坏字段不该让
+        整个会话不可恢复；认不出的字段按"没有历史"处理即可。
+
+        :param data: 快照里的 detection 段，类型不对时整体跳过
+        """
+        if not isinstance(data, dict):
+            return
+
+        # 1. 重复调用签名：恢复后模型再打转，前几步要能算进连续次数
+        signatures = data.get("recent_tool_signatures")
+        if isinstance(signatures, list):
+            self._recent_tool_signatures = [str(item) for item in signatures]
+
+        # 2. 工具失败计数：恢复后继续沿用熔断进度，换个进程不等于清零
+        failures = data.get("tool_failures")
+        if isinstance(failures, dict):
+            self._tool_failures = {
+                str(name): count
+                for name, count in failures.items()
+                if isinstance(count, int) and not isinstance(count, bool)
+            }
+
+        # 3. 已见工具名与结果摘要：无进展判定依赖这两个集合
+        names = data.get("seen_tool_names")
+        if isinstance(names, list):
+            self._seen_tool_names = {str(item) for item in names}
+        digests = data.get("seen_result_digests")
+        if isinstance(digests, list):
+            self._seen_result_digests = {str(item) for item in digests}
+
+        # 4. 连续无进展步数：bool 是 int 子类，必须排除，否则 True 会被当成 1
+        steps = data.get("no_progress_steps")
+        if isinstance(steps, int) and not isinstance(steps, bool):
+            self._no_progress_steps = steps
 
     def _snapshot_expired(self, path: Path) -> bool:
         """快照是否已过期。取不到 mtime 时按未过期处理，宁可多给一次机会。"""

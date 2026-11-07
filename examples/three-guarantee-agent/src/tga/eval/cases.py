@@ -164,7 +164,7 @@ def _parse_snapshot_expect(case_id: str, raw: Any) -> dict[str, Any] | None:
     if not isinstance(raw, dict):
         raise ValueError("用例 %s 的 snapshot_expect 必须是对象" % case_id)
 
-    allowed = {"status", "resumable", "min_step"}
+    allowed = {"status", "resumable", "min_step", "detection_keys"}
     unknown = sorted(set(raw) - allowed)
     if unknown:
         raise ValueError(

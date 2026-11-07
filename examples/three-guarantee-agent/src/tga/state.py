@@ -19,7 +19,8 @@ from pathlib import Path
 from typing import Any
 
 # 快照格式版本：字段增删必须递增，读取时按版本做兼容或明确拒绝
-SCHEMA_VERSION = 1
+# v2：新增 detection（骨架检测状态），恢复后死循环识别、熔断、无进展判定不能从零开始
+SCHEMA_VERSION = 2
 # 快照过期时间（秒）：超过即视为不可恢复，只能新开会话
 DEFAULT_SNAPSHOT_TTL_S = 24 * 3600
 # 归档目录保留时长（秒）：过期快照先归档再清，留出人工捞回的窗口
@@ -68,6 +69,10 @@ class SessionState:
     usage: dict[str, Any] = field(default_factory=dict)
     # 已调用工具清单：工具名 + 参数指纹 + 结果摘要（03 §1），既用于恢复对账也用于死循环识别
     tool_records: list[dict[str, Any]] = field(default_factory=list)
+    # 骨架检测状态：重复调用签名、工具失败计数、已见工具名/结果摘要、无进展步数。
+    # WHY 必须一起落盘：这些不是"这一轮的临时变量"，而是会话事实；恢复后若归零，
+    # 模型接着打转也不会被识别，前几步等于白送。
+    detection: dict[str, Any] = field(default_factory=dict)
     schema_version: int = SCHEMA_VERSION
 
     @classmethod
