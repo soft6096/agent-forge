@@ -1,6 +1,6 @@
 ---
 name: agent-core-standards
-description: "Agent 运行时骨架硬规范：主循环、状态机、终止条件、失败与重试、超时、幂等、会话生命周期、并发排队、模型输出解析容错。触发：写个 agent、实现 agent 主循环、agent 骨架、agent 跑飞了、死循环、不收敛、步数超限、重试策略、超时怎么设、多轮会话状态、并发冲突、输出解析失败。**任何 agent 骨架代码生成/修改前必须加载本 skill**（包括不走完整流程的零散写码）。边界：工具定义归 agent-tool-standards，上下文裁剪与记忆归 agent-context-memory-standards，检索归 agent-rag-standards，成本埋点归 agent-ops-standards。"
+description: "Agent 运行时骨架硬规范：主循环、状态机、终止条件、失败与重试、超时、幂等、会话生命周期、并发排队、模型输出解析容错。触发：写个 agent、实现 agent 主循环、agent 骨架、agent 跑飞了、死循环、不收敛、步数超限、重试策略、超时怎么设、多轮会话状态、会话中断恢复不了状态、只能从头再问一遍、续跑不了、并发冲突、输出解析失败。**任何 agent 骨架代码生成/修改前必须加载本 skill**（包括不走完整流程的零散写码）。边界：工具定义归 agent-tool-standards，上下文裁剪与历史被截断归 agent-context-memory-standards（不因出现「会话」二字就命中本技能），检索归 agent-rag-standards，成本埋点归 agent-ops-standards。"
 ---
 
 # Agent 骨架规范
