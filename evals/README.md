@@ -51,7 +51,8 @@
 | v2（复测） | 2026-11-06 | T18 转 pass（仅命中 workflow） | eval 的 description 加否定边界 |
 | v3（真实选择器 · CodeBuddy IDE） | 2026-11-07 | 3 pass / 2 fail（T05、T18 漏命中，已排除上下文累积） | 未改任何 description；T05 标 source=真实，两条确认为真实缺陷 |
 | v3 复测（独立干净会话） | 2026-11-07 | T05 加载 workflow 而非 core；T18 无任何技能加载 | 两条 fail 维持；真实加载与盲判不一致，前置条件①仍不满足 |
-| v4（改后盲判，非实测） | 2026-11-07 | 17/17 pass（smoke 12 + adversarial 4 + T05） | 改 description 后重跑两层；T05 / T18 盲判转 pass，真实选择器仍待重测 |
+| v4（改后盲判，非实测） | 2026-11-07 | 17/17 pass（smoke 12 + adversarial 4 + T05） | 改 description 后重跑两层；T05 / T18 盲判转 pass，真实选择器实测见 v5 |
+| v5（真实选择器 · 改后 · CodeBuddy IDE） | 2026-11-07 | 5/5 pass（五个独立干净会话，must_not 全未命中） | 未再改 description；SKILL-MAP 4.9 前置条件①转已完成 |
 
 ### 盲判方法（可以复用的做法）
 
@@ -77,12 +78,12 @@ T18 复测只命中 `agent-dev-workflow`，eval 不再被拉入。同批复测�
 
 以上是子代理盲判，**不是真实客户端的技能选择器实测**。建议在改完 description 后，至少用新会话跑一次 T04 / T05 / T06 / T08 / T18 五条，确认真实加载与盲判一致；若不一致，以真实结果为准并回填样本。
 
-> 2026-11-07 复核：真实选择器实测已执行，且 T05 / T18 已在各自独立的干净会话里复测，
-> 两条仍为 expect_main 漏命中，上下文累积的解释被排除，**属于真实的 description 缺陷**。
-> 真实加载与盲判不一致，因此 agent-skill-authoring 的定稿前置条件仍未满足（见 SKILL-MAP 4.9）。
-> 剩余动作：description 已按第 11 节 #8 修正、两层盲判 17/17 通过；只等改后的真实选择器实测五条全绿。
+> 2026-11-07 终态复核：真实选择器实测已执行。旧 description 下 3 pass / 2 fail（T05 / T18 漏命中，
+> 已排除上下文累积），据此按第 11 节 #8 修正触发词并重跑两层盲判；改后五个各自独立的干净会话
+> 实测 5/5 pass，`must_not` 全未命中。**agent-skill-authoring 的定稿前置条件①已完成**（见 SKILL-MAP 4.9），
+> 连同已完成的②，两项前置条件现已全部满足。
 
-### 实测执行清单（v3 已回填；改 description 后待重测）
+### 实测执行清单（v5 改后实测已回填）
 
 下面五行按 T04 / T05 / T06 / T08 / T18 顺序排列，可直接逐条复制进**新开的会话**，不要补充背景、不要加前缀：
 
@@ -96,16 +97,36 @@ T18 复测只命中 `agent-dev-workflow`，eval 不再被拉入。同批复测�
 
 | 样本 | expect_main | must_not | 实际加载的技能 | 判定 |
 |---|---|---|---|---|
-| T04 | agent-core-standards | agent-tool-standards | `agent-core-standards` | pass |
-| T05 | agent-core-standards | agent-context-memory-standards | `agent-dev-workflow`（干净会话复测） | fail（expect_main 漏命中） |
+| T04 | agent-core-standards | agent-tool-standards | `agent-core-standards`、`agent-dev-workflow` | pass |
+| T05 | agent-core-standards | agent-context-memory-standards | `agent-core-standards` | pass |
 | T06 | agent-context-memory-standards | agent-core-standards | `agent-context-memory-standards` | pass |
 | T08 | agent-safety-standards（tool 可伴随） | agent-rag-standards | `agent-safety-standards` | pass |
-| T18 | agent-dev-workflow（check 可伴随） | agent-rag / ops / tool / eval | 无技能加载（干净会话复测） | fail（expect_main 漏命中） |
+| T18 | agent-dev-workflow（check 可伴随） | agent-rag / ops / tool / eval | `agent-dev-workflow` | pass |
 
 判定口径按上面的三条规则：expect_main 有漏命中即 fail；must_not 有命中即 fail；其余 pass。
+上表为 **v5（改 description 后）** 的实测结果；v3 旧结果保留在下方详录中供比对。
+T04 额外加载的 `agent-dev-workflow` 属于 `expect_optional`，按口径不算错。
 
-> 2026-11-07 v3 已回填，**前置条件①仍未满足**：T05 / T18 在独立干净会话里仍是 expect_main 漏命中，
-> 已排除上下文累积。不启动 `agent-skill-authoring` 定稿。禁止用盲判结果冒充真实选择器实测。
+> 2026-11-07 v5 已回填，**前置条件①已完成**：五个各自独立的干净会话 5/5 pass，
+> `must_not` 全部未命中。连同已完成的②，`agent-skill-authoring` 定稿的两项前置条件全部满足。
+> 禁止用盲判结果冒充真实选择器实测。
+
+### v5 改后真实选择器实测（2026-11-07）
+
+安装刷新到 `83e112f` 之后，五个**各自独立的干净会话**（每个会话仅 1 条 user 消息，首条即样本原话），
+从会话历史按会话提取 `use_skill` 调用（不是模型自述）：
+
+| 样本 | 会话内实际 `use_skill` | expect_main | must_not | 判定 |
+|---|---|---|---|---|
+| T04 | `agent-core-standards`、`agent-dev-workflow` | 命中 | 未命中 | pass |
+| T05 | `agent-core-standards` | 命中 | 未命中 | pass |
+| T06 | `agent-context-memory-standards` | 命中 | 未命中 | pass |
+| T08 | `agent-safety-standards` | 命中 | 未命中 | pass |
+| T18 | `agent-dev-workflow` | 命中 | 未命中 | pass |
+
+五条全绿，旧 description 下的两条漏触发（T05 误走 workflow、T18 无加载）均已消除，
+且新增触发语未把 T06 的 core、T19 / T20 的 workflow 误拉进来（后两条见 v4 盲判）。
+改后真实加载与盲判一致，SKILL-MAP 4.9 前置条件①据此转已完成。
 
 ### v3 结果详录（2026-11-07）
 
@@ -124,14 +145,15 @@ T04 / T06 / T08 来自一个会话内依次发送的独立消息；T05 / T18 来
 随后在各自独立的干净会话里分别只发 T05、T18，结果是 T05 加载 `agent-dev-workflow`、
 T18 仍无任何技能加载。两条 fail 维持，且 `must_not` 全部未命中——是**漏触发**，不是误触发。
 
-**结论**：真实加载与盲判不一致，`SKILL-MAP.md:215` 前置条件①不满足。按维护规则，
+**结论**：真实加载与盲判不一致，SKILL-MAP 4.9 前置条件①当时不满足。按维护规则，
 T05 的 `source` 已从「构造」改为「真实」，T18 备注追加本次证据；`description` 尚未修改。
 修 `description` 会改变选择器输入，须按「改动先改 SKILL-MAP.md」的纪律同步职责卡与边界、
 跑体积审计并刷新基线、重跑 smoke + adversarial 两层，之后重做真实选择器实测。
 
 > 2026-11-07 补充：上述纪律已执行（SKILL-MAP 4.1 / 4.2 与第 11 节 #8、两个 description、
 > 体积审计与基线、两层盲判 17/17）。**本表所有 v3 实测结果只对旧 description 成立，改后一律失效**；
-> 前置条件①须等改后的真实会话实测五条全绿才能解锁。盲判转 pass 不等于真实选择器转 pass。
+> 改后的真实选择器实测见上方 v5（5/5 pass），前置条件①已解锁。盲判转 pass 不等于真实选择器转 pass。
+> 本表保留为旧 description 下的历史基线，不删、不改写数字。
 
 ### v3 尝试记录（作废）：复合输入不产生逐条判定（2026-11-07）
 
@@ -143,7 +165,7 @@ T05 的 `source` 已从「构造」改为「真实」，T18 备注追加本次�
 | `use_skill` 调用 | 仅 1 次，加载 `agent-dev-workflow` |
 | 其余技能 | 未加载 |
 
-**判定：该会话作废，不计入 v3（当次未回填，前置条件①仍为未完成）。** 这是执行方式错误（五句合并成一条），
+**判定：该会话作废，不计入 v3（当次未回填，前置条件①当时仍为未完成）。** 这是执行方式错误（五句合并成一条），
 不是选择器误触发或漏触发；把这一次 `agent-dev-workflow` 调用拆成 T04 / T05 / T06 / T08 / T18 五条结论属于伪造。
 该会话可作为一条真实的边界观察保留：复合症状输入会先走 `agent-dev-workflow` 的入口分诊，
 但不计入本样本集的逐条判定。
