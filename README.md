@@ -128,9 +128,12 @@ cd agent-forge
 
 ```
 agent-forge/
-├── README.md / SKILL-MAP.md / global-rules.md / install.sh
+├── README.md / AGENTS.md / SKILL-MAP.md / global-rules.md / install.sh
 ├── .gitignore                    # 含 !**/SKILL.md 反忽略
 ├── .size-baseline.json           # 体积基线，改技能后跑审计对比
+├── evals/                        # 技能触发样本 20 条 + 判定口径（skill-trigger.jsonl）
+├── examples/
+│   └── three-guarantee-agent/    # 可运行示例：主循环 / 工具契约 / 幂等 / 冒烟与负样本评测
 ├── scripts/
 │   └── audit-size.py             # 技能体积审计（按实际加载路径统计）
 └── skill/
