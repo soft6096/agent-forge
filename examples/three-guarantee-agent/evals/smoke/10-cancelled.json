@@ -1,0 +1,10 @@
+{
+  "id": "10-cancelled",
+  "input": "判定这台车是否在保（手动中断）",
+  "cancel_before_run": true,
+  "expect": {
+    "reason": "cancelled",
+    "max_steps": 1
+  },
+  "note": "用户中断：开跑前置标志，第一步检查点即终止并保留会话快照"
+}

@@ -1,0 +1,29 @@
+{
+  "input": "一直查同一个零件的保修期",
+  "turns": [
+    {
+      "text": "",
+      "prompt_tokens": 800,
+      "completion_tokens": 30,
+      "tool_calls": [
+        {"id": "c08a", "type": "function", "function": {"name": "query_warranty_period", "arguments": "{\"vin\": \"LSVAA1234R1234567\", \"part_name\": \"发动机\"}"}}
+      ]
+    },
+    {
+      "text": "",
+      "prompt_tokens": 880,
+      "completion_tokens": 30,
+      "tool_calls": [
+        {"id": "c08b", "type": "function", "function": {"name": "query_warranty_period", "arguments": "{\"vin\": \"LSVAA1234R1234567\", \"part_name\": \"发动机\"}"}}
+      ]
+    },
+    {
+      "text": "",
+      "prompt_tokens": 960,
+      "completion_tokens": 30,
+      "tool_calls": [
+        {"id": "c08c", "type": "function", "function": {"name": "query_warranty_period", "arguments": "{\"vin\": \"LSVAA1234R1234567\", \"part_name\": \"发动机\"}"}}
+      ]
+    }
+  ]
+}

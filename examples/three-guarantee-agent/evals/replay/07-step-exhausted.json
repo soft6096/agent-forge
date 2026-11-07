@@ -1,0 +1,69 @@
+{
+  "input": "把这台车所有系统的保修情况都查一遍",
+  "turns": [
+    {
+      "text": "",
+      "prompt_tokens": 820,
+      "completion_tokens": 30,
+      "tool_calls": [
+        {"id": "c07a", "type": "function", "function": {"name": "query_warranty_period", "arguments": "{\"vin\": \"LSVAA1234R1234567\", \"part_name\": \"发动机\"}"}}
+      ]
+    },
+    {
+      "text": "",
+      "prompt_tokens": 900,
+      "completion_tokens": 30,
+      "tool_calls": [
+        {"id": "c07b", "type": "function", "function": {"name": "query_warranty_period", "arguments": "{\"vin\": \"LSVAA1234R1234567\", \"part_name\": \"变速箱\"}"}}
+      ]
+    },
+    {
+      "text": "",
+      "prompt_tokens": 980,
+      "completion_tokens": 30,
+      "tool_calls": [
+        {"id": "c07c", "type": "function", "function": {"name": "query_warranty_period", "arguments": "{\"vin\": \"LSVAA1234R1234567\", \"part_name\": \"动力电池\"}"}}
+      ]
+    },
+    {
+      "text": "",
+      "prompt_tokens": 1060,
+      "completion_tokens": 30,
+      "tool_calls": [
+        {"id": "c07d", "type": "function", "function": {"name": "query_warranty_period", "arguments": "{\"vin\": \"LSVAA1234R1234567\", \"part_name\": \"转向系统\"}"}}
+      ]
+    },
+    {
+      "text": "",
+      "prompt_tokens": 1140,
+      "completion_tokens": 30,
+      "tool_calls": [
+        {"id": "c07e", "type": "function", "function": {"name": "query_warranty_period", "arguments": "{\"vin\": \"LSVAA1234R1234567\", \"part_name\": \"制动系统\"}"}}
+      ]
+    },
+    {
+      "text": "",
+      "prompt_tokens": 1220,
+      "completion_tokens": 30,
+      "tool_calls": [
+        {"id": "c07f", "type": "function", "function": {"name": "query_warranty_period", "arguments": "{\"vin\": \"LSVAA1234R1234567\", \"part_name\": \"车身\"}"}}
+      ]
+    },
+    {
+      "text": "",
+      "prompt_tokens": 1300,
+      "completion_tokens": 30,
+      "tool_calls": [
+        {"id": "c07g", "type": "function", "function": {"name": "query_warranty_period", "arguments": "{\"vin\": \"LSVAA1234R1234567\", \"part_name\": \"空调系统\"}"}}
+      ]
+    },
+    {
+      "text": "",
+      "prompt_tokens": 1380,
+      "completion_tokens": 30,
+      "tool_calls": [
+        {"id": "c07h", "type": "function", "function": {"name": "search_clause", "arguments": "{\"query\": \"包修期\"}"}}
+      ]
+    }
+  ]
+}

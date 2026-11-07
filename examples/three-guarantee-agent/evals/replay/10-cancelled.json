@@ -1,0 +1,10 @@
+{
+  "input": "判定这台车是否在保（手动中断）",
+  "turns": [
+    {
+      "text": "这一轮不会被消费：中断在第一步检查点就已生效。",
+      "prompt_tokens": 0,
+      "completion_tokens": 0
+    }
+  ]
+}

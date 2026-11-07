@@ -1,0 +1,12 @@
+{
+  "id": "01-read-only-ok",
+  "input": "VIN 为 LSVAA1234R1234567，变速箱异响是否在保",
+  "expect": {
+    "reason": "completed",
+    "max_steps": 3,
+    "tools_used": ["query_warranty_period"],
+    "answer_contains": ["在保"],
+    "tool_error_codes": []
+  },
+  "note": "只读工具正常链路：查保修期后给出带出处的结论"
+}

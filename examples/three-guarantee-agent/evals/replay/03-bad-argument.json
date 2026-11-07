@@ -1,0 +1,40 @@
+{
+  "input": "帮我看下 VIN LSVAA1234R1234567 的变速器还在保吗",
+  "turns": [
+    {
+      "text": "",
+      "prompt_tokens": 800,
+      "completion_tokens": 34,
+      "tool_calls": [
+        {
+          "id": "call_03a",
+          "type": "function",
+          "function": {
+            "name": "query_warranty_period",
+            "arguments": "{\"vin\": \"LSVAA1234R1234567\", \"part_name\": \"变速器\"}"
+          }
+        }
+      ]
+    },
+    {
+      "text": "",
+      "prompt_tokens": 980,
+      "completion_tokens": 36,
+      "tool_calls": [
+        {
+          "id": "call_03b",
+          "type": "function",
+          "function": {
+            "name": "query_warranty_period",
+            "arguments": "{\"vin\": \"LSVAA1234R1234567\", \"part_name\": \"变速箱\"}"
+          }
+        }
+      ]
+    },
+    {
+      "text": "结论：在保可赔\n依据：[1] 家用汽车产品修理、更换、退货责任规定 > 第十八条\n说明：按变速箱口径重查，时间与里程均在保修范围内。",
+      "prompt_tokens": 1450,
+      "completion_tokens": 66
+    }
+  ]
+}

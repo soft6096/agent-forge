@@ -1,0 +1,128 @@
+"""评测用例：加载与校验。
+
+为什么用例放 JSON 而不是写测试类：判定项固定、可读，改一条期望结论不用动代码，
+售后专家也能直接维护；用例写错时在加载期就报错，不会静默跑成"零用例全绿"。
+"""
+
+from __future__ import annotations
+
+import json
+from dataclasses import dataclass
+from pathlib import Path
+
+from ..loop import TermReason
+
+# 判定条件里必须显式给出的字段；其余按默认值（不限制）处理
+_REQUIRED_EXPECT_FIELDS = ("reason", "max_steps")
+
+
+@dataclass(frozen=True)
+class CaseExpect:
+    """一条用例的判定条件。全部命中才算通过，任一不命中都要能说清差在哪。"""
+
+    reason: str                                # 期望的终止原因，取值必须是五类之一
+    max_steps: int                             # 允许的最大步数，超出算失控
+    tools_used: tuple[str, ...] = ()           # 期望被调用过的工具，按"包含"判定
+    answer_contains: tuple[str, ...] = ()      # 答复里必须出现的片段
+    answer_not_contains: tuple[str, ...] = ()  # 答复里不允许出现的片段（如编造的条款号）
+    tool_error_codes: tuple[str, ...] = ()     # 期望出现的工具错误码，按集合相等判定
+
+
+@dataclass(frozen=True)
+class Case:
+    """一条评测用例：输入 + 判定条件 + 说明。"""
+
+    case_id: str            # 用例标识，文件名通常与之一致
+    input_text: str         # 喂给助手的用户输入原文
+    expect: CaseExpect      # 判定条件
+    cancel_before_run: bool  # 是否在开跑前置中断标志，用于覆盖 cancelled 分支
+    note: str               # 这条用例覆盖什么，失败时直接进报告
+    path: Path              # 用例文件路径，便于定位
+
+
+def load_cases(suite_dir: Path, only: str | None = None) -> list[Case]:
+    """加载并校验一个用例集。
+
+    :param suite_dir: 用例目录，一个 JSON 文件一条用例
+    :param only: 只加载指定 id 的用例；None 表示全部
+    :return: 用例列表，按文件名排序，保证多次运行输出顺序一致
+    :raises ValueError: 目录不存在、目录为空、字段缺失、id 重复或 reason 不合法
+    """
+    # 1. 目录校验：空目录跑出"零失败"是最危险的假绿
+    if not suite_dir.is_dir():
+        raise ValueError("用例目录不存在：%s" % suite_dir)
+    files = sorted(suite_dir.glob("*.json"))
+    if not files:
+        raise ValueError("用例目录为空：%s" % suite_dir)
+
+    # 2. 逐文件解析并校验 id 唯一
+    cases: list[Case] = []
+    seen: set[str] = set()
+    for path in files:
+        case = _parse_case(path)
+        if only is not None and case.case_id != only:
+            continue
+        if case.case_id in seen:
+            raise ValueError("用例 id 重复：%s" % case.case_id)
+        seen.add(case.case_id)
+        cases.append(case)
+
+    # 3. 过滤后为空说明 id 写错，不能静默返回空集当作通过
+    if not cases:
+        raise ValueError("没有匹配的用例：%s" % (only or suite_dir))
+    return cases
+
+
+def _parse_case(path: Path) -> Case:
+    """解析单个用例文件，字段缺失或取值非法立即抛错。
+
+    :param path: 用例文件路径
+    :return: 用例对象
+    :raises ValueError: 字段缺失或取值非法，消息指明是哪个用例哪个字段
+    :raises json.JSONDecodeError: 文件不是合法 JSON
+    """
+    # 1. 读原始 JSON，坏文件直接报错
+    data = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(data, dict):
+        raise ValueError("用例必须是 JSON 对象：%s" % path.name)
+
+    # 2. 基础字段
+    case_id = str(data.get("id") or "").strip()
+    if not case_id:
+        raise ValueError("用例缺少 id：%s" % path.name)
+    input_text = str(data.get("input") or "").strip()
+    if not input_text:
+        raise ValueError("用例 %s 缺少 input" % case_id)
+
+    # 3. 判定条件：reason 必须落在五类终止里，避免写出永远不可能通过的用例
+    raw = data.get("expect")
+    if not isinstance(raw, dict):
+        raise ValueError("用例 %s 缺少 expect 段" % case_id)
+    for field in _REQUIRED_EXPECT_FIELDS:
+        if field not in raw:
+            raise ValueError("用例 %s 的 expect 缺少 %s" % (case_id, field))
+
+    reason = str(raw["reason"])
+    if reason not in {item.value for item in TermReason}:
+        raise ValueError(
+            "用例 %s 的 reason %r 不在五类终止内：%s"
+            % (case_id, reason, " / ".join(item.value for item in TermReason))
+        )
+
+    # 4. 组装：列表型字段统一转元组，避免调用方误改
+    expect = CaseExpect(
+        reason=reason,
+        max_steps=int(raw["max_steps"]),
+        tools_used=tuple(str(x) for x in (raw.get("tools_used") or ())),
+        answer_contains=tuple(str(x) for x in (raw.get("answer_contains") or ())),
+        answer_not_contains=tuple(str(x) for x in (raw.get("answer_not_contains") or ())),
+        tool_error_codes=tuple(str(x) for x in (raw.get("tool_error_codes") or ())),
+    )
+    return Case(
+        case_id=case_id,
+        input_text=input_text,
+        expect=expect,
+        cancel_before_run=bool(data.get("cancel_before_run", False)),
+        note=str(data.get("note") or ""),
+        path=path,
+    )

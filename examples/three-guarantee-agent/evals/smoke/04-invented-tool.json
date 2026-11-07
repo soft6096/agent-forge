@@ -1,0 +1,12 @@
+{
+  "id": "04-invented-tool",
+  "input": "查一下工单 WO123 的处理进度",
+  "expect": {
+    "reason": "completed",
+    "max_steps": 3,
+    "tools_used": [],
+    "answer_contains": ["转人工"],
+    "tool_error_codes": ["not_found"]
+  },
+  "note": "编造工具名：返回可用清单，模型不得假装查到了工单"
+}

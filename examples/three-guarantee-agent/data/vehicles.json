@@ -1,0 +1,18 @@
+{
+  "_comment": "示例车辆档案。真实接入时换成本车主数据接口，工具契约不变。reference_date 固定，保证同一输入任何时候跑出同一结论。",
+  "reference_date": "2026-11-06",
+  "vehicles": {
+    "LSVAA1234R1234567": {
+      "model": "示例牌 A 型 1.5T 舒适版",
+      "purchase_date": "2024-03-15",
+      "mileage_km": 38200,
+      "usage_type": "personal"
+    },
+    "LSVBB5678T7654321": {
+      "model": "示例牌 B 型 2.0T 四驱版",
+      "purchase_date": "2021-06-30",
+      "mileage_km": 96300,
+      "usage_type": "operating"
+    }
+  }
+}

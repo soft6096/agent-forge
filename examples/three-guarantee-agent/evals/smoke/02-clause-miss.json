@@ -1,0 +1,13 @@
+{
+  "id": "02-clause-miss",
+  "input": "VIN 为 LSVAA1234R1234567，赔付金额怎么算",
+  "expect": {
+    "reason": "completed",
+    "max_steps": 3,
+    "tools_used": ["search_clause"],
+    "answer_contains": ["未查到"],
+    "answer_not_contains": ["[1]"],
+    "tool_error_codes": []
+  },
+  "note": "检索未命中：必须说明未查到并转人工，不得编造条款出处"
+}

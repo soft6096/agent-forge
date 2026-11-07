@@ -1,0 +1,11 @@
+{
+  "input": "判定这辆车是否在保",
+  "turns": [
+    {
+      "raise": {
+        "message": "HTTP 400 请求体不合法：messages 缺少必需字段",
+        "retryable": false
+      }
+    }
+  ]
+}

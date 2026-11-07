@@ -1,0 +1,10 @@
+{
+  "id": "07-step-exhausted",
+  "input": "把这台车所有系统的保修情况都查一遍",
+  "expect": {
+    "reason": "step_exhausted",
+    "max_steps": 8,
+    "tools_used": ["query_warranty_period"]
+  },
+  "note": "步数耗尽：模型持续换参数调工具，达到上限即终止并保留快照"
+}

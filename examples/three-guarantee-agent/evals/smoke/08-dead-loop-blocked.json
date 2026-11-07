@@ -1,0 +1,10 @@
+{
+  "id": "08-dead-loop-blocked",
+  "input": "一直查同一个零件的保修期",
+  "expect": {
+    "reason": "blocked",
+    "max_steps": 3,
+    "tools_used": ["query_warranty_period"]
+  },
+  "note": "不收敛识别：同一调用连续 3 步即终止，不等步数耗尽"
+}

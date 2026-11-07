@@ -1,0 +1,12 @@
+{
+  "id": "03-bad-argument",
+  "input": "帮我看下 VIN LSVAA1234R1234567 的变速器还在保吗",
+  "expect": {
+    "reason": "completed",
+    "max_steps": 4,
+    "tools_used": ["query_warranty_period"],
+    "answer_contains": ["在保"],
+    "tool_error_codes": ["invalid_argument"]
+  },
+  "note": "枚举写错（变速器）：工具回填可修正错误，模型改对后重查"
+}

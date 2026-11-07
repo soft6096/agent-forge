@@ -1,0 +1,25 @@
+{
+  "input": "查一下工单 WO123 的处理进度",
+  "turns": [
+    {
+      "text": "",
+      "prompt_tokens": 760,
+      "completion_tokens": 28,
+      "tool_calls": [
+        {
+          "id": "call_04",
+          "type": "function",
+          "function": {
+            "name": "query_order",
+            "arguments": "{\"id\": \"WO123\"}"
+          }
+        }
+      ]
+    },
+    {
+      "text": "我没有工单查询能力，未查到相关规定。请转人工核实工单进度。",
+      "prompt_tokens": 1050,
+      "completion_tokens": 40
+    }
+  ]
+}

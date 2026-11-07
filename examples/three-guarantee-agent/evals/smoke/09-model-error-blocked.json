@@ -1,0 +1,9 @@
+{
+  "id": "09-model-error-blocked",
+  "input": "判定这辆车是否在保",
+  "expect": {
+    "reason": "blocked",
+    "max_steps": 1
+  },
+  "note": "模型层不可重试错误：直接 blocked，不浪费重试次数"
+}

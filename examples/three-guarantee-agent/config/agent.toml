@@ -1,0 +1,51 @@
+# three-guarantee-agent 运行配置
+# 所有可调常量都在这里：模型、预算、超时、开关。代码里不出现魔数。
+
+[agent]
+name = "three-guarantee-agent"
+version = "0.1.0"
+prompt_version = "v1"              # 对应 config/prompts/system.md 的 version
+
+[model]
+provider = "auto"                  # auto | replay | openai；auto = 有凭据走 openai，否则降级 replay
+name = "gpt-4o-mini"
+temperature = 0.2
+max_output_tokens = 800            # 与预算表的输出预留联动
+api_base = "https://api.openai.com/v1"
+
+[budget]
+max_steps = 8                      # 单任务最大步数（硬上限，非魔数）
+max_task_tokens = 60000            # 单任务 token 上限
+max_cost_cny = 0.5                 # 单任务金额上限（元），超限即终止，不再发起下一步
+price_in_cny_per_1k = 0.001        # 输入单价，按实际模型改
+price_out_cny_per_1k = 0.002       # 输出单价
+
+[retrieval]
+top_k = 3                          # 单次检索最多返回条数，防止一次把条款库塞进上下文
+similarity_threshold = 3           # 最低命中分，低于该分按未命中处理，不得编造条款
+
+[idempotency]
+enabled = true                     # 关闭后写类工具失去重复保护，只允许排障时临时关
+dir = "runtime/idempotency"        # 幂等键与结果落盘目录，不进版本库
+window_s = 7200                    # 去重窗口 2 小时，远大于单任务 120s，留足重试余量
+
+[timeout]
+llm_ms = 30000                     # 单次模型调用超时
+tool_ms = 8000                     # 单次工具调用超时
+task_ms = 120000                   # 单任务总时长
+
+[cancellation]
+poll_interval_ms = 200             # 取消信号检查间隔
+
+[safety]
+require_approval = true            # 高危工具人工确认总开关，默认开，关闭需写明理由
+input_filter = true                # 入向过滤（敏感信息 + 注入特征打标）
+output_filter = true               # 出向过滤
+external_content_isolation = true  # 外部内容与指令分离
+
+[eval]
+# 评测默认不执行：主流程不会自动跑评测，只有显式执行 tga.eval.runner 才会跑。
+# 需要跑时先与开发人员确认，避免无谓的时间与 token 消耗。
+enabled = true                     # 评测能力开关（关闭后不加载用例）
+smoke_dir = "evals/smoke"          # 冒烟集目录，一文件一条用例
+gate_min_pass_rate = 0.8           # 门禁兜底阈值（冒烟集另要求全绿）

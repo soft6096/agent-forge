@@ -1,0 +1,25 @@
+{
+  "input": "VIN 为 LSVAA1234R1234567，赔付金额怎么算",
+  "turns": [
+    {
+      "text": "",
+      "prompt_tokens": 780,
+      "completion_tokens": 30,
+      "tool_calls": [
+        {
+          "id": "call_02",
+          "type": "function",
+          "function": {
+            "name": "search_clause",
+            "arguments": "{\"query\": \"赔付金额怎么算\"}"
+          }
+        }
+      ]
+    },
+    {
+      "text": "未查到相关规定。赔付金额与责任认定不在我的判定范围内，建议转人工处理。",
+      "prompt_tokens": 1120,
+      "completion_tokens": 45
+    }
+  ]
+}
