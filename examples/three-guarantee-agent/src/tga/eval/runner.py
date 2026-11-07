@@ -17,6 +17,7 @@ from dataclasses import dataclass, field
 from ..llm import ReplayProvider
 from ..loop import AgentLoop, TaskResult
 from ..ops.logging import StructuredLogger
+from ..safety.filters import strip_external
 from ..settings import Settings, load_settings
 from ..tools.builtin import build_registry
 from .cases import Case, load_cases
@@ -136,13 +137,16 @@ def _tool_error_codes(result: TaskResult) -> list[str]:
         if message.get("role") != "tool":
             continue
 
-        # 2. 解析失败直接跳过：回填内容本身是骨架写的，坏了属于实现问题不是判定问题
+        # 2. 先剥掉外部内容分隔符：开启了内容隔离时，tool 消息外面会包一层数据标记
+        raw = strip_external(str(message.get("content") or ""))
+
+        # 3. 解析失败直接跳过：回填内容本身是骨架写的，坏了属于实现问题不是判定问题
         try:
-            payload = json.loads(str(message.get("content") or "{}"))
+            payload = json.loads(raw)
         except json.JSONDecodeError:
             continue
 
-        # 3. 只有 ok=false 且带 error 码的消息才算错误
+        # 4. 只有 ok=false 且带 error 码的消息才算错误
         error = payload.get("error") if isinstance(payload, dict) else None
         if isinstance(error, dict) and error.get("error"):
             codes.append(str(error["error"]))
