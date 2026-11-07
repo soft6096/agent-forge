@@ -16,6 +16,7 @@ agent 的安全前提只有一条：**模型输出一律不可信，外部内容
 | 外部内容进上下文、注入识别、分隔与标记 | `standards/01-prompt-injection.md` |
 | 工具越权、高危确认、执行边界与人在环 | `standards/02-permission-and-hitl.md` |
 | 敏感信息双向过滤、输出过滤、审计与人工接管 | `standards/03-data-and-output.md` |
+| 动作会落到进程外（浏览器 / 桌面 / 外部 API / 云资源）的执行边界 | `references/external-action-boundary.md` |
 
 **按需精确加载**，不要整目录读入。
 
@@ -46,6 +47,8 @@ agent 的安全前提只有一条：**模型输出一律不可信，外部内容
 | 注入 / 越权样本的落库、统计与门禁 | agent-eval-standards |
 | token 与调用计量、trace 结构 | agent-ops-standards |
 | 会话状态与中断恢复 | agent-core-standards |
+| 网络隔离、IAM、密钥托管、microVM / 容器隔离 | 基础设施安全，不在本技能 |
+| 浏览器 / CDP 框架 API、沙箱部署、产品选型 | 不覆盖，见 SKILL-MAP 1.4 |
 
 ## 交付前
 

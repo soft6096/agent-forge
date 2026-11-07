@@ -16,6 +16,7 @@ description: "Agent 工具与函数调用的契约规范：工具粒度与命名
 | 工具有几个、怎么切、怎么命名、怎么让模型选对 | `standards/01-schema-and-granularity.md` |
 | 副作用分级、幂等键、权限边界、错误返回、超时与重试 | `standards/02-side-effect-and-errors.md` |
 | 接 MCP 服务、包装外部 API、写工具描述与示例 | `standards/03-mcp-and-integration.md` |
+| 工具会改变进程外状态（浏览器 / 桌面 / 外部 API 写 / 云资源） | `references/external-system-tools.md` |
 
 **按需精确加载**，不要整目录读入。
 
@@ -43,8 +44,10 @@ description: "Agent 工具与函数调用的契约规范：工具粒度与命名
 |---|---|
 | 主循环、终止条件、失败分类与重试次数 | agent-core-standards |
 | 工具结果裁剪、注入上下文的预算 | agent-context-memory-standards |
-| 工具越权拦截、高危工具人工确认开关 | agent-safety-standards |
+| 工具越权拦截、高危工具人工确认开关、外部动作的执行边界 | agent-safety-standards |
 | 工具调用次数与 token 计量、trace 落点 | agent-ops-standards |
+| 网络隔离、IAM、密钥托管、microVM / 容器隔离 | 基础设施安全，不在本技能 |
+| 浏览器 / CDP 框架 API、沙箱与容器部署、产品选型 | 不覆盖，见 SKILL-MAP 1.4 |
 | 工具内部业务逻辑、SQL、事务 | 业务侧规范 |
 
 ## 交付前

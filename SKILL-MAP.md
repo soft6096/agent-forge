@@ -130,9 +130,9 @@
 
 **职责**：工具与函数调用的完整契约规范。
 
-覆盖：工具粒度与命名（一个工具一件事）、schema 必填项（名称、描述、参数类型、约束、示例）、参数校验与拒绝语义、副作用分级（只读/写/高危）、幂等要求与去重键、权限与租户边界、错误返回约定（让模型能读懂并自我修正）、超时与重试归属、MCP 工具接入与本地工具的差异、工具数量上限与检索式工具选择。
+覆盖：工具粒度与命名（一个工具一件事）、schema 必填项（名称、描述、参数类型、约束、示例）、参数校验与拒绝语义、副作用分级（只读/写/高危）、幂等要求与去重键、权限与租户边界、错误返回约定（让模型能读懂并自我修正）、超时与重试归属、MCP 工具接入与本地工具的差异、工具数量上限与检索式工具选择、**操作外部系统的高危工具契约**（目标白名单、参数指纹、确认令牌绑定、结果未知不盲重试、审计字段；见 `references/external-system-tools.md`）。
 
-**边界**：工具内部业务逻辑不归它（归业务规范）；工具调用的编排策略归 core。
+**边界**：工具内部业务逻辑不归它（归业务规范）；工具调用的编排策略归 core；浏览器 / 桌面自动化的框架 API 教程、容器与沙箱部署、具体产品选型不归它（见 1.4）。
 
 **生成物**：工具定义、schema JSON、MCP 配置。
 
@@ -190,9 +190,9 @@
 
 **职责**：安全与兜底。
 
-覆盖：提示词注入识别与隔离（外部内容与指令分离）、工具越权调用防护、高危工具的人在环确认、敏感信息出入双向过滤、输出内容过滤与合规、模型输出不可信前提下的执行边界、审计留痕与可回溯、失败兜底话术与人工接管、越狱与诱导的回归用例。
+覆盖：提示词注入识别与隔离（外部内容与指令分离）、工具越权调用防护、高危工具的人在环确认、敏感信息出入双向过滤、输出内容过滤与合规、模型输出不可信前提下的执行边界、审计留痕与可回溯、失败兜底话术与人工接管、越狱与诱导的回归用例、**外部系统动作的执行边界**（三道闸门、确认与执行分离、外部内容不改变权限判定、结果未知转人工；见 `references/external-action-boundary.md`）。
 
-**边界**：不覆盖基础设施安全（网络、IAM）；不做合规法律判断。
+**边界**：不覆盖基础设施安全（网络、IAM、密钥托管、microVM 与容器隔离）；不做合规法律判断；不教浏览器 / CDP 框架 API。
 
 **生成物**：拦截层、审计日志、人工接管流程。
 
@@ -314,6 +314,8 @@
 | 安全 | 外部输入是否与指令分离；高危工具是否有人工确认开关；输出是否过滤 |
 | 技能 | frontmatter 是否合规；description 是否含触发语；是否超体积预算 |
 
+> 外部系统动作的专项判据不新增编号：契约侧挂第 6 项（副作用等级已标注）、执行边界侧挂第 26 项（高危工具有人工确认开关），逐条判定口径写在 `skill/check-agent-standards/references/checklist.md` 对应项下。核对项总数仍为 30。
+
 ---
 
 ## 8. 与 jee-forge 的复用映射
@@ -376,9 +378,9 @@ agent-forge/
     ├── agent-dev-workflow/        # SKILL.md + references/ + commands/ + templates/
     ├── agent-core-standards/      # SKILL.md + standards/
     ├── agent-eval-standards/      # SKILL.md + standards/
-    ├── agent-tool-standards/      # SKILL.md + standards/
+    ├── agent-tool-standards/      # SKILL.md + standards/ + references/
     ├── agent-context-memory-standards/  # SKILL.md + standards/
-    ├── agent-safety-standards/    # SKILL.md + standards/
+    ├── agent-safety-standards/    # SKILL.md + standards/ + references/
     ├── agent-ops-standards/       # SKILL.md + standards/
     ├── agent-rag-standards/       # SKILL.md + standards/
     ├── check-agent-standards/     # SKILL.md + references/ + scripts/
@@ -405,6 +407,8 @@ agent-forge/
 | 3 | rag-standards 是否自带最小检索基线 | 不带；只给口径与阈值判据，最小可跑模拟放示例 | skill/agent-rag-standards/ 仅 SKILL.md + standards/ 三份，无实现代码；examples/three-guarantee-agent/src/tga/tools/builtin.py:196 为本地关键词 + 阈值模拟 |
 | 4 | 是否单列 quick-change 旁路技能 | 不单列，由 agent-dev-workflow 的轻量模式与小改动短路承接 | skill/agent-dev-workflow/SKILL.md:18-36 |
 | 5 | 是否建示例 agent 工程 | 已建，作为规范可落地性与回归验证的基准 | examples/three-guarantee-agent/（冒烟 12 条 + 负样本 7 条 + 真实失败报告 evals/reports/negative-20261107.txt） |
+| 6 | 是否把浏览器 / 云沙箱等运行时能力纳入技能边界 | 不纳入；只补「操作外部系统的高危工具」的契约与执行边界细则，不补框架教程与部署 | SKILL-MAP 1.4 四条明确不做；细则落 agent-tool-standards / agent-safety-standards 各一份 references，专项判据挂既有第 6 / 26 项，核对项总数仍 30 |
+| 7 | 示例工程是否需要真实模型指标（P95 / 均值） | 需要，但不得用 replay 时延或假数据填表；接真实模型后至少 20 次采样再定阈值 | examples/three-guarantee-agent/docs/three-guarantee-agent-v0.1.0-20261107/7.1-评测报告与需求覆盖.md 第五节 |
 
 ---
 

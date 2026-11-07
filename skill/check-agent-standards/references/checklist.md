@@ -51,6 +51,20 @@
 - 自动模式：`read_only|readOnly|destructive|risk_level|side_effect`
 - manual：分级是否合理
 
+**专项：操作外部系统的工具**（细则见 `agent-tool-standards/references/external-system-tools.md`）
+命中判据：工具执行会改变进程外状态（浏览器 / 桌面动作、外部 API 写、发消息、云资源变更、文件与数据库写）。
+逐条人工判定，任缺一项即 fail：
+
+1. `side_effect` 固定为 `dangerous`，未因"只点一下"降级
+2. 有 `target_allowlist`（域名 / 路径 / 账号 / 资源 id 白名单），模型给的自由 URL 不直接执行
+3. 有 `params_digest`（工具名 + 归一化参数摘要）
+4. 有 `idempotency_key` 与写明的去重窗口
+5. 超时返回区分「已执行 / 未执行 / 未知」，`unknown` 不触发自动重试
+6. 审计含 `target / params_digest / decision`
+
+手工：`grep -rnE "side_effect|target_allowlist|params_digest|idempotency_key" . --include=*.py --include=*.ts --include=*.java`
+说明：本专项不新增编号，仍归第 6 项；脚本正则不扩，避免把"出现了关键词"误判为"闸门生效"，逐条判定由人工完成。
+
 ### 7. 写类工具有幂等键
 
 - 判定：写类工具出现幂等键或去重逻辑
@@ -188,6 +202,19 @@
 
 - 判定：高危工具执行前有确认闸门
 - 自动模式：`require_approval|needs_confirmation|human_in_the_loop|confirm_required|approval`
+
+**专项：动作落到进程外的执行边界**（细则见 `agent-safety-standards/references/external-action-boundary.md`）
+逐条人工判定，任缺一项即 fail：
+
+1. 三道闸门都在工具执行前由代码执行：目标白名单 → 参数指纹校验 → 人工确认；提示词里一句"请先询问用户"不算
+2. 确认令牌绑定 `tool_name + params_digest + session_id`，模型与主循环都拿不到令牌
+3. 令牌有过期时间；拒绝、超时、参数变更各有明确返回，参数变更使令牌失效
+4. `unknown` 结果不自动重试，转人工或走幂等查询
+5. 拦截与人工确认全链路留痕，可回溯到会话 id 与步序号
+6. 对抗样本覆盖：直接指令覆盖（中 / 英）、角色提权、**刻意不命中入向特征规则的改写变体**
+
+手工：`grep -rnE "require_approval|params_digest|confirm|approval" . --include=*.py --include=*.ts`
+说明：本专项不新增编号，仍归第 26 项；脚本正则不扩，避免"出现关键词"被误判为"闸门生效"。
 
 ### 27. 输出有过滤
 

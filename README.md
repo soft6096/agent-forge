@@ -35,9 +35,9 @@ agent-forge 就是把这四件事变成流程与规范。核心方法只有一�
 
 | 技能 | 类 | 职责 |
 |---|---|---|
-| [`agent-tool-standards`](skill/agent-tool-standards) | 规范 | 工具粒度与命名、schema 九字段、副作用分级、幂等与去重窗口、权限边界、错误语义、超时归属、MCP 接入、工具选择策略 |
+| [`agent-tool-standards`](skill/agent-tool-standards) | 规范 | 工具粒度与命名、schema 九字段、副作用分级、幂等与去重窗口、权限边界、错误语义、超时归属、MCP 接入、工具选择策略、操作外部系统的高危工具契约 |
 | [`agent-context-memory-standards`](skill/agent-context-memory-standards) | 规范 | 上下文预算表、组装顺序与不可变段、裁剪与滚动摘要、降级阶梯、三层记忆与写入判据、遗忘与污染防护 |
-| [`agent-safety-standards`](skill/agent-safety-standards) | 规范 | 提示词注入与内容隔离、越权防护、高危工具人在环、双向过滤与脱敏、审计留痕、人工接管 |
+| [`agent-safety-standards`](skill/agent-safety-standards) | 规范 | 提示词注入与内容隔离、越权防护、高危工具人在环、外部系统动作执行边界、双向过滤与脱敏、审计留痕、人工接管 |
 | [`agent-ops-standards`](skill/agent-ops-standards) | 规范 | token 计量口径、成本核算与三层预算、缓存与模型分级、trace/span 与日志七字段、告警三档、降级与看板 |
 | [`agent-rag-standards`](skill/agent-rag-standards) | 规范 | 切分与索引更新、召回阈值与重排、查询改写与多路融合、引用强制、无命中拒答、权限过滤、离线召回评测 |
 
@@ -140,9 +140,9 @@ agent-forge/
     ├── agent-dev-workflow/              # SKILL.md + references/ + commands/ + templates/
     ├── agent-core-standards/            # SKILL.md + standards/
     ├── agent-eval-standards/            # SKILL.md + standards/
-    ├── agent-tool-standards/            # SKILL.md + standards/
+    ├── agent-tool-standards/            # SKILL.md + standards/ + references/
     ├── agent-context-memory-standards/  # SKILL.md + standards/
-    ├── agent-safety-standards/          # SKILL.md + standards/
+    ├── agent-safety-standards/          # SKILL.md + standards/ + references/
     ├── agent-ops-standards/             # SKILL.md + standards/
     ├── agent-rag-standards/             # SKILL.md + standards/
     ├── check-agent-standards/           # SKILL.md + references/ + scripts/
