@@ -49,7 +49,8 @@
 |---|---|---|---|
 | v1（盲判） | 2026-11-06 | 19 pass / 1 fail（T18） | 建立样本集；check 的 description 补适用边界 |
 | v2（复测） | 2026-11-06 | T18 转 pass（仅命中 workflow） | eval 的 description 加否定边界 |
-| v3（真实选择器 · CodeBuddy IDE） | 2026-11-07 | 3 pass / 2 fail（T05、T18 无技能加载，存疑） | 未改任何 description；T05 / T18 待独立干净会话复测 |
+| v3（真实选择器 · CodeBuddy IDE） | 2026-11-07 | 3 pass / 2 fail（T05、T18 漏命中，已排除上下文累积） | 未改任何 description；T05 标 source=真实，两条确认为真实缺陷 |
+| v3 复测（独立干净会话） | 2026-11-07 | T05 加载 workflow 而非 core；T18 无任何技能加载 | 两条 fail 维持；真实加载与盲判不一致，前置条件①仍不满足 |
 
 ### 盲判方法（可以复用的做法）
 
@@ -75,9 +76,10 @@ T18 复测只命中 `agent-dev-workflow`，eval 不再被拉入。同批复测�
 
 以上是子代理盲判，**不是真实客户端的技能选择器实测**。建议在改完 description 后，至少用新会话跑一次 T04 / T05 / T06 / T08 / T18 五条，确认真实加载与盲判一致；若不一致，以真实结果为准并回填样本。
 
-> 2026-11-07 复核：真实选择器实测已执行（见下方 v3 结果详录），但结论为 3 pass / 2 fail，且两条 fail 受同一会话上下文累积污染，
-> 尚不能用于确认「真实加载与盲判一致」，因此 agent-skill-authoring 的定稿前置条件仍未满足（见 SKILL-MAP 4.9）。
-> 剩余动作：T05 / T18 各在独立干净会话里复测一次。
+> 2026-11-07 复核：真实选择器实测已执行，且 T05 / T18 已在各自独立的干净会话里复测，
+> 两条仍为 expect_main 漏命中，上下文累积的解释被排除，**属于真实的 description 缺陷**。
+> 真实加载与盲判不一致，因此 agent-skill-authoring 的定稿前置条件仍未满足（见 SKILL-MAP 4.9）。
+> 剩余动作：修 description 后重跑两层并重做真实选择器实测。
 
 ### 实测执行清单（v3 已回填）
 
@@ -94,36 +96,37 @@ T18 复测只命中 `agent-dev-workflow`，eval 不再被拉入。同批复测�
 | 样本 | expect_main | must_not | 实际加载的技能 | 判定 |
 |---|---|---|---|---|
 | T04 | agent-core-standards | agent-tool-standards | `agent-core-standards` | pass |
-| T05 | agent-core-standards | agent-context-memory-standards | 无技能加载 | fail（存疑，待干净会话复测） |
+| T05 | agent-core-standards | agent-context-memory-standards | `agent-dev-workflow`（干净会话复测） | fail（expect_main 漏命中） |
 | T06 | agent-context-memory-standards | agent-core-standards | `agent-context-memory-standards` | pass |
 | T08 | agent-safety-standards（tool 可伴随） | agent-rag-standards | `agent-safety-standards` | pass |
-| T18 | agent-dev-workflow（check 可伴随） | agent-rag / ops / tool / eval | 无技能加载 | fail（存疑，待干净会话复测） |
+| T18 | agent-dev-workflow（check 可伴随） | agent-rag / ops / tool / eval | 无技能加载（干净会话复测） | fail（expect_main 漏命中） |
 
 判定口径按上面的三条规则：expect_main 有漏命中即 fail；must_not 有命中即 fail；其余 pass。
 
-> 2026-11-07 v3 已回填，但**前置条件①仍未满足**：T05 / T18 按字面判 fail，且执行条件存在同一会话上下文累积，
-> 不能据此修改任何 description，也不启动 `agent-skill-authoring` 定稿。禁止用盲判结果冒充真实选择器实测。
+> 2026-11-07 v3 已回填，**前置条件①仍未满足**：T05 / T18 在独立干净会话里仍是 expect_main 漏命中，
+> 已排除上下文累积。不启动 `agent-skill-authoring` 定稿。禁止用盲判结果冒充真实选择器实测。
 
-### v3 结果详录与局限（2026-11-07）
+### v3 结果详录（2026-11-07）
 
-数据来源：安装刷新到 `fc6b71b` 之后的一个干净会话，五条原话分别作为**独立 user 消息**发出，
-从会话历史按消息顺序提取每条之后的所有 `use_skill` 调用（不是模型自述）。
+数据来源：安装刷新到 `fc6b71b` 之后的会话历史，逐条提取 `use_skill` 调用（不是模型自述）。
+T04 / T06 / T08 来自一个会话内依次发送的独立消息；T05 / T18 来自**两个各自独立的干净会话**。
 
 | 样本 | 实际 `use_skill` | must_not 是否命中 | 判定 |
 |---|---|---|---|
 | T04 | `agent-core-standards` | 否 | pass |
-| T05 | 无 | 否 | fail（存疑） |
+| T05 | `agent-dev-workflow` | 否 | fail（core 漏命中） |
 | T06 | `agent-context-memory-standards` | 否 | pass |
 | T08 | `agent-safety-standards` | 否 | pass |
-| T18 | 无 | 否 | fail（存疑） |
+| T18 | 无 | 否 | fail（workflow 漏命中） |
 
-**为什么两条 fail 存疑**：五条在**同一会话**内依次发送，且该会话首条是已作废的复合输入（它加载过
-`agent-dev-workflow`）。T04 先加载了 `agent-core-standards`，T05 再问同类主责时技能内容已在上下文里；
-T18 之后模型的推理文本自述「按前几轮模式」「第五条」，说明它在延续前文而非做独立选择器判定。
-因此「无技能加载」更可能是上下文累积，而不是选择器缺陷，**不得据此改 description 或回填真实误触发样本**。
+**复测已排除上下文累积**：五条最初在同一会话内依次发送，两条无技能加载曾被标为「存疑」；
+随后在各自独立的干净会话里分别只发 T05、T18，结果是 T05 加载 `agent-dev-workflow`、
+T18 仍无任何技能加载。两条 fail 维持，且 `must_not` 全部未命中——是**漏触发**，不是误触发。
 
-**收尾条件**：在各自独立的干净会话里分别只发 T05、T18 各一条，两条都命中 expect_main 且 must_not
-未命中，才能把 v3 结论改写为 5 pass、解锁 `SKILL-MAP.md:215` 前置条件①。
+**结论**：真实加载与盲判不一致，`SKILL-MAP.md:215` 前置条件①不满足。按维护规则，
+T05 的 `source` 已从「构造」改为「真实」，T18 备注追加本次证据；`description` 尚未修改。
+修 `description` 会改变选择器输入，须按「改动先改 SKILL-MAP.md」的纪律同步职责卡与边界、
+跑体积审计并刷新基线、重跑 smoke + adversarial 两层，之后重做真实选择器实测。
 
 ### v3 尝试记录（作废）：复合输入不产生逐条判定（2026-11-07）
 
@@ -143,8 +146,8 @@ T18 之后模型的推理文本自述「按前几轮模式」「第五条」，�
 重跑方式：在干净会话里把上面五行**一条一条单独发送**（每行一次回车，不要合并成一条消息），
 发完由读取会话历史按消息顺序逐条提取 `use_skill`，再回填上面的两列。
 
-> 后续：已按此方式重跑并回填 v3，结果见「v3 结果详录与局限」；同一会话逐条发送的上下文累积
-> 导致 T05 / T18 仍需在各自独立的干净会话里复测。
+> 后续：已按此方式重跑并回填 v3，结果见「v3 结果详录」；T05 / T18 已在各自独立的干净会话里复测，
+> 两条仍为漏命中，上下文累积的解释被排除。
 
 ### 实测前置门槛：安装态版本核对（2026-11-07）
 
@@ -175,7 +178,7 @@ git push origin main
 > 2026-11-07 更新：上表是**刷新前**的时点核对，结论「不合格」已被推翻。
 > 推送 8 个提交后重跑安装，日志打印「远端快照：fc6b71b ...」，与开发源 HEAD 一致；
 > 安装标记 commit 同步为 `fc6b71b`，两份新增细则就位、软链无断链，开发源 `skill/` 与安装副本
-> `skill/` 逐字节一致。**安装态硬判据现已满足**，不再阻断实测；阻断项只剩「逐条独立发送」。
+> `skill/` 逐字节一致。**安装态硬判据现已满足**，不再阻断实测；当前阻断项已转为 T05 / T18 的真实 description 缺陷。
 > 此后 v3 回填只改本目录文档、未动 `skill/`，按上述硬判据不影响实测有效性。
 
 ### 静态预检：本轮改动不改变选择器输入
