@@ -53,7 +53,8 @@
 | v3 复测（独立干净会话） | 2026-11-07 | T05 加载 workflow 而非 core；T18 无任何技能加载 | 两条 fail 维持；真实加载与盲判不一致，前置条件①仍不满足 |
 | v4（改后盲判，非实测） | 2026-11-07 | 17/17 pass（smoke 12 + adversarial 4 + T05） | 改 description 后重跑两层；T05 / T18 盲判转 pass，真实选择器实测见 v5 |
 | v5（真实选择器 · 改后 · CodeBuddy IDE） | 2026-11-07 | 5/5 pass（五个独立干净会话，must_not 全未命中） | 未再改 description；SKILL-MAP 4.9 前置条件①转已完成 |
-| v6（盲判 · 11 技能版，非实测） | 2026-11-08 | 22/22 pass（smoke 13 + adversarial 5 + regression 4，must_not 全未命中） | 新增第 11 个技能与 T21 / T22 样本；既有 10 个 description 未改；真机选择器实测待执行 |
+| v6（盲判 · 11 技能版，非实测） | 2026-11-08 | 22/22 pass（smoke 13 + adversarial 5 + regression 4，must_not 全未命中） | 新增第 11 个技能与 T21 / T22 样本；既有 10 个 description 未改；真机选择器实测见 v7 |
+| v7（真实选择器 · 11 技能版 · CodeBuddy IDE） | 2026-11-08 | 8/8 pass（8 个独立干净会话，must_not 全未命中） | 第 11 个技能真机验收通过；未改任何 description；本轮无真实误触发 / 漏触发，样本无需回填 |
 
 ### 盲判方法（可以复用的做法）
 
@@ -214,9 +215,10 @@ git push origin main
 当时对 10 个 `SKILL.md` 的 frontmatter 与安装副本逐个比对，结果全部一致（`name` / `description` 未改），
 `description` 最长 963 字符，未超 1024 上限；技能体积审计结论为「全部在预算线内」。
 该轮改动只落在正文、加载矩阵与新增 `references/`，因此当时 v1 / v2 的盲判结论仍成立。
-**此结论只对当时的 10 技能版本成立**：11 技能版新增了一份 description，选择器输入已改变，以 v6 为准。
+**此结论只对当时的 10 技能版本成立**：11 技能版新增了一份 description，选择器输入已改变，
+以 v6 盲判与 v7 真机实测为准。
 
-### v6 盲判与待执行真机清单（2026-11-08）
+### v6 盲判与真机执行清单（2026-11-08）
 
 第 11 个技能 `agent-skill-authoring` 定稿后，样本补到 22 条（T21 正向、T22 相邻边界）。
 让不知道标准答案的子代理只读 11 份 frontmatter 逐条盲判，结果 22/22 pass：
@@ -224,10 +226,9 @@ smoke 13 + adversarial 5 + regression 4 全部命中 `expect_main`，`must_not` 
 关键边界 T17 / T22 都只加载 `agent-forge-source-law`，新技能的「分发」触发词没有抢走安装排查类输入；
 正向 T21 只加载 `agent-skill-authoring`。既有 10 个技能的 description 本轮一字未改。
 
-> **本轮结论只到盲判为止，不是真实选择器实测。** 新技能首次引入 description，
-> 必须在安装态刷新后由用户在新开的、各自独立的干净会话里逐条实测，回填前不得称「验收通过」。
+> v6 本身只是盲判，不是真实选择器实测；真机结论见下方 v7。
 
-待执行清单（8 条，每条各开一个干净会话、只发一条原话、不要加前缀或背景）：
+执行清单（8 条，已于 2026-11-08 在 8 个各自独立的干净会话里逐条执行完毕，每个会话仅 1 条 user 消息）：
 
 ```
 技能装了但是不生效，说'技能不触发'也没反应
@@ -241,7 +242,35 @@ smoke 13 + adversarial 5 + regression 4 全部命中 `expect_main`，`must_not` 
 ```
 
 前三条验证第 11 个技能的边界与正向加载，后五条（v5 原班样本）验证 11 技能环境下历史易错项没被抢。
-判定按三条口径，实测结果按 v5 的格式回填一张表。
+
+### v7 真实选择器实测（11 技能版，2026-11-08）
+
+安装态刷新到 `4f48002`（11 个技能）之后，8 个**各自独立的干净会话**，
+从会话历史按消息顺序提取 `use_skill` 工具调用（不是模型自述，也不是盲判）：
+
+| 样本 | 会话 | 会话内实际 `use_skill` | expect_main | must_not | 判定 |
+|---|---|---|---|---|---|
+| T17 | `e01dc49c`（11:34:52） | `agent-forge-source-law` | 命中 | 未命中 | pass |
+| T21 | `64fae163`（11:29:07） | `agent-skill-authoring` | 命中 | 未命中 | pass |
+| T22 | `16d42c80`（11:28:01） | `agent-forge-source-law` | 命中 | 未命中 | pass |
+| T04 | `dafe4445`（11:35:39） | `agent-core-standards` | 命中 | 未命中 | pass |
+| T05 | `dd611bf7`（11:30:50） | `agent-core-standards` | 命中 | 未命中 | pass |
+| T06 | `18b3bcc5`（11:34:10） | `agent-context-memory-standards` | 命中 | 未命中 | pass |
+| T08 | `e2074d82`（11:31:22） | `agent-safety-standards` | 命中 | 未命中 | pass |
+| T18 | `3d0f4411`（11:30:16） | `agent-dev-workflow` | 命中 | 未命中 | pass |
+
+8/8 pass，`must_not` 全部未命中。关键结论：
+
+- T17 / T22 只加载 `agent-forge-source-law`，新增技能的「分发 / 触发词」触发语没有抢走安装排查类输入
+- T21 只加载 `agent-skill-authoring`，第 11 个技能在真实客户端里确实可触发
+- v5 的五条历史易错样本在 11 技能环境下全部保持 pass，既有 10 个 description 未改动
+- 8 个会话的 `user` 消息数均为 1，且都在安装刷新（10:24）之后启动，无上下文累积、无旧版本污染
+
+**验收结论**：`agent-skill-authoring` 定稿的两层回归（v6 盲判 22/22 + v7 真机 8/8）均通过，
+前置条件①在 11 技能环境下重新确认，第 11 个技能定稿验收通过。
+
+> 技能正文与细则里的「经验来源 v1~v5」指的是立法实证；v6 / v7 是定稿后的回归验证，
+> 本轮未改任何 `description`，选择器输入未变，故不改写 `skill/` 下的文件、无需重跑体积审计与安装。
 
 ## 维护
 

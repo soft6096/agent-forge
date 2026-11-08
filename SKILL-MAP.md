@@ -220,6 +220,7 @@ agent 的提示词改了一句、感觉效果好像好点（非改动请求的�
 > ① 真实客户端技能选择器实测 T04 / T05 / T06 / T08 / T18 五条 —— **已完成**（2026-11-07）：改 description 后五个各自独立的干净会话 5/5 pass，must_not 全未命中（见 evals/README.md 判定记录 v5 与「v5 改后真实选择器实测」）。
 > ② 真实任务走完 1.1~7.1 并落产物样例 —— **已完成**，见 examples/three-guarantee-agent/docs/three-guarantee-agent-v0.1.0-20261107/。
 > 定稿结果（2026-11-08）：①②满足后已定稿并创建目录，产物为 SKILL.md（八条可核对硬规则）+ `references/frontmatter-and-triggers.md` + `references/disclosure-and-budget.md`；硬规则已挂到 check-agent-standards 第 28~30 项判据，触发样本补 T21 / T22，体积基线与安装态同步刷新。
+> 验收（2026-11-08）：v6 盲判 22/22 + v7 真机 8/8（T17 / T21 / T22 与 v5 五条，8 个各自独立的干净会话），两层回归均通过，前置条件①在 11 技能环境下重新确认，第 11 个技能定稿验收通过。
 
 ### 4.10 check-agent-standards
 
