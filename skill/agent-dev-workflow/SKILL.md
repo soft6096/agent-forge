@@ -77,7 +77,7 @@ description: "AI Agent 完整开发流程：新建 agent 项目、存量 agent �
 | 6.1 | check-agent-standards |
 | 7.1 | agent-eval-standards + agent-ops-standards |
 
-加载到技能后按各自的加载矩阵**精确读子文件**，禁止整目录读入。`agent-skill-authoring` 仍在规划（第三批），写技能本身不在本流程内。
+加载到技能后按各自的加载矩阵**精确读子文件**，禁止整目录读入。写技能本身归 `agent-skill-authoring`，不在本流程内。
 
 ## 中间产物落盘规则
 
@@ -96,5 +96,5 @@ description: "AI Agent 完整开发流程：新建 agent 项目、存量 agent �
 
 - 只改提示词/参数/单点实现 → 本技能轻量模式，不落产物
 - 任何 agent 代码写完 → 一律过 `check-agent-standards`
-- 写技能本身（SKILL.md、触发词、分发）→ `agent-skill-authoring`（规划中，未发布），不在本流程内；落地前按 SKILL-MAP 4.9 的检查清单自查
+- 写技能本身（SKILL.md、触发词、分发）→ `agent-skill-authoring`，不在本流程内；按该技能的 references 专项判据自查
 - 技能装不上/改了没生效 → `agent-forge-source-law`

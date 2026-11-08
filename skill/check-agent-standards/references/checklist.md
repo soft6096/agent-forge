@@ -226,18 +226,22 @@
 ## 技能
 
 > 28~30 只在含 skill/ 目录的仓库适用；业务仓库没有技能目录时判 n/a，不判 manual（manual 会虚增待办）。
+> 这三项对应 `agent-skill-authoring` 的八条硬规则，语义项（能否区分相邻技能、加载矩阵是否悬空）一律标 manual，禁止凭记忆答通过。
 
 ### 28. frontmatter 合规
 
 - 判定：每个 skill/*/SKILL.md 有 YAML frontmatter，含 name 与 description，name 与目录名一致
+- 追加判定：frontmatter 只有 name 与 description 两个字段；description ≤ 1024 字符（超了客户端不加载，脚本按 `len(desc) > 1024` 判定）
 - 手工：`head -5 skill/*/SKILL.md`
 
 ### 29. description 含触发语
 
 - 判定：description 里出现"触发""使用时机"或具体场景词，长度足够 Agent 判断
-- manual：判断能否区分相邻技能
+- 追加判定：触发语取自真实用户原话而非术语；必须同时写**点名归属技能**的否定边界（"归 agent-forge-source-law"这类），只写"不归我"判 fail；改触发词时相邻技能的边界与样本 must_not 同步
+- manual：判断能否区分相邻技能；盲判结果不能冒充真实选择器实测，改过 description 必须有新会话的 use_skill 证据
 
 ### 30. 未超体积预算
 
 - 判定：SKILL.md 不超过预算（默认 300 行 / 24KB），超出的判据应下沉到 references/
-- 手工：`wc -l skill/*/SKILL.md`
+- 追加判定：按**加载路径**算（SKILL.md + 会被加载的 references/standards ≤ 900 行 / 72KB），随件只限 40 个文件；SKILL.md 的加载矩阵指向的文件必须真实存在；改完刷新 `.size-baseline.json`
+- 手工：`wc -l skill/*/SKILL.md`；`python3 scripts/audit-size.py --root .`

@@ -1,6 +1,6 @@
 # agent-forge 技能地图（SKILL-MAP）
 
-> 状态：11 个技能中 10 个已落地并安装（第一批 5 个 + 第二批 5 个）；仅 agent-skill-authoring 仍在规划，尚未创建目录。
+> 状态：11 个技能全部落地并安装（第一批 5 个 + 第二批 5 个 + 第三批 1 个）；第 9 号 agent-skill-authoring 已依据真实选择器实测结果定稿。
 > 本文是后续所有实现的基准，技能清单、职责边界、产物编号、分批计划以本文为准；改动先改本文再改代码。
 
 ---
@@ -93,7 +93,7 @@
 | 10 | check-agent-standards | 核对 | 可机械判定的规范兜底扫描 + 证据报告 | 核对报告（JSON/MD） |
 | 11 | agent-forge-source-law | 元 | 区分开发源与安装产物，禁止拿源目录当安装源 | 安装回执 |
 
-> 落地状态：第 1~8、10、11 已发布（共 10 个目录）；第 9 号 agent-skill-authoring 为规划中，无对应目录。
+> 落地状态：第 1~11 全部已发布（共 11 个目录）；第 9 号 agent-skill-authoring 于 2026-11-08 定稿（SKILL.md + 2 份 references）。
 
 ---
 
@@ -213,13 +213,13 @@ agent 的提示词改了一句、感觉效果好像好点（非改动请求的�
 
 **生成物**：技能目录、体积审计脚本、触发测试用例。
 
-**触发说法**：写个技能、写个 skill、技能不触发、技能太大、skill 目录结构、分发安装。
+**触发说法**：写个技能、写个 skill、SKILL.md 该怎么写、skill 目录结构、技能太大、加载路径超预算、触发词怎么修、技能改完怎么分发。
 
 > 优先级说明：本技能排在第三批，需前两批技能真实运行一轮后再定稿，避免凭空立法。
 > 定稿前置条件（2026-11-07 明确，未全部满足前不启动，状态记在本条不再另开文档）：
 > ① 真实客户端技能选择器实测 T04 / T05 / T06 / T08 / T18 五条 —— **已完成**（2026-11-07）：改 description 后五个各自独立的干净会话 5/5 pass，must_not 全未命中（见 evals/README.md 判定记录 v5 与「v5 改后真实选择器实测」）。
 > ② 真实任务走完 1.1~7.1 并落产物样例 —— **已完成**，见 examples/three-guarantee-agent/docs/three-guarantee-agent-v0.1.0-20261107/。
-> 状态（2026-11-07）：①②均已完成，可以启动本技能定稿；目录尚未创建，定稿本身需另行排期。
+> 定稿结果（2026-11-08）：①②满足后已定稿并创建目录，产物为 SKILL.md（八条可核对硬规则）+ `references/frontmatter-and-triggers.md` + `references/disclosure-and-budget.md`；硬规则已挂到 check-agent-standards 第 28~30 项判据，触发样本补 T21 / T22，体积基线与安装态同步刷新。
 
 ### 4.10 check-agent-standards
 
@@ -361,14 +361,14 @@ agent 的提示词改了一句、感觉效果好像好点（非改动请求的�
 验收标准：工具 schema 与上下文预算表能在第一批流程的 3.2 与 5.1 中被真实引用。
 落地情况：三个技能各自 SKILL.md + 3 份 standards；3.2 与 5.1 的加载矩阵已改为必须加载。
 
-### 第三批（依赖具体栈与运行经验，3 个）—— 2 个已提前落地
+### 第三批（依赖具体栈与运行经验，3 个）—— 3 个已落地
 
 9. agent-rag-standards（已落地）
 10. agent-ops-standards（已落地）
-11. agent-skill-authoring（待定稿）
+11. agent-skill-authoring（已定稿，2026-11-08）
 
 验收标准：自家前 10 个技能通过一次体积审计与触发测试后，再据此定稿技能工程规范。
-落地情况：rag 与 ops 已落地（各 SKILL.md + 3 份 standards）；前 10 个技能已通过体积审计与真实选择器触发测试，agent-skill-authoring 的两项定稿前置条件均已满足，待排期定稿。
+落地情况：rag 与 ops 已落地（各 SKILL.md + 3 份 standards）；前 10 个技能已通过体积审计与真实选择器触发测试（v5 5/5），两项前置条件满足后 agent-skill-authoring 于 2026-11-08 定稿，现共 11 个技能目录。
 
 ---
 
@@ -380,7 +380,7 @@ agent-forge/
 ├── .gitignore                     # 含 !**/SKILL.md 反忽略
 ├── .size-baseline.json            # 体积基线
 ├── scripts/                       # 体积审计等仓级脚本
-└── skill/                         # 当前已落地 10 个
+└── skill/                         # 当前已落地 11 个
     ├── agent-dev-workflow/        # SKILL.md + references/ + commands/ + templates/
     ├── agent-core-standards/      # SKILL.md + standards/
     ├── agent-eval-standards/      # SKILL.md + standards/
@@ -391,7 +391,7 @@ agent-forge/
     ├── agent-rag-standards/       # SKILL.md + standards/
     ├── check-agent-standards/     # SKILL.md + references/ + scripts/
     ├── agent-forge-source-law/    # SKILL.md
-    └── 规划中（尚无目录）：agent-skill-authoring
+    └── agent-skill-authoring/     # SKILL.md + references/
 ```
 
 命名规则：

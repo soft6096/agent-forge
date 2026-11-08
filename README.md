@@ -4,7 +4,7 @@
 
 **English:** agent-forge is a family of Agent Skills for AI agent development. It sits between generic software methodology and framework tutorials: it does not teach you how to call an SDK, it constrains what you build into shapes that can be mechanically checked and statistically evaluated. The flagship skill `agent-dev-workflow` enforces one rule above all others — **define the evaluation before writing the code**.
 
-当前状态：**10 个技能已落地**，可直接安装使用；仅 `agent-skill-authoring` 仍在规划（需前 10 个技能真实运行一轮后再定稿）。
+当前状态：**11 个技能全部落地**，可直接安装使用。第 11 个 `agent-skill-authoring` 依据前 10 个技能的真实选择器实测结果定稿。
 
 ---
 
@@ -41,11 +41,11 @@ agent-forge 就是把这四件事变成流程与规范。核心方法只有一�
 | [`agent-ops-standards`](skill/agent-ops-standards) | 规范 | token 计量口径、成本核算与三层预算、缓存与模型分级、trace/span 与日志七字段、告警三档、降级与看板 |
 | [`agent-rag-standards`](skill/agent-rag-standards) | 规范 | 切分与索引更新、召回阈值与重排、查询改写与多路融合、引用强制、无命中拒答、权限过滤、离线召回评测 |
 
-### 规划中（1 个）
+### 第三批（已落地，1 个）
 
 | 技能 | 类 | 职责 | 批次 |
 |---|---|---|---|
-| `agent-skill-authoring` | 规范 | 技能工程：SKILL.md 写法、触发词、渐进披露、体积预算、分发与版本 | 三 |
+| [`agent-skill-authoring`](skill/agent-skill-authoring) | 规范 | 技能工程：SKILL.md 写法、触发词与否定边界、渐进披露、体积预算、分发与来源回执 | 三 |
 
 ## 三、流程一览
 
@@ -122,6 +122,7 @@ cd agent-forge
 | 成本与监控 | "太贵了" / "加 trace"（加载 agent-ops-standards） |
 | 召回不准 / 引用出处 | "召回不准" / "做 RAG"（加载 agent-rag-standards） |
 | 交付前检查 | "对 src 跑 check-agent-standards" |
+| 写技能 / 修触发词 / 技能太大 | "写个技能" / "SKILL.md 该怎么写" / "加载路径超预算"（加载 agent-skill-authoring） |
 | 技能没生效 | "技能不触发"（加载 agent-forge-source-law） |
 
 ## 六、仓库结构
@@ -131,7 +132,7 @@ agent-forge/
 ├── README.md / AGENTS.md / SKILL-MAP.md / global-rules.md / install.sh
 ├── .gitignore                    # 含 !**/SKILL.md 反忽略
 ├── .size-baseline.json           # 体积基线，改技能后跑审计对比
-├── evals/                        # 技能触发样本 20 条 + 判定口径（skill-trigger.jsonl）
+├── evals/                        # 技能触发样本 22 条 + 判定口径（skill-trigger.jsonl）
 ├── examples/
 │   └── three-guarantee-agent/    # 可运行示例：主循环 / 工具契约 / 幂等 / 冒烟与负样本评测
 ├── scripts/
@@ -146,7 +147,8 @@ agent-forge/
     ├── agent-ops-standards/             # SKILL.md + standards/
     ├── agent-rag-standards/             # SKILL.md + standards/
     ├── check-agent-standards/           # SKILL.md + references/ + scripts/
-    └── agent-forge-source-law/          # SKILL.md
+    ├── agent-forge-source-law/          # SKILL.md
+    └── agent-skill-authoring/           # SKILL.md + references/
 ```
 
 ## 七、与 jee-forge 的关系
