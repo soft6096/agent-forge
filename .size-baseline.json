@@ -9,7 +9,7 @@
   },
   "agent-dev-workflow": {
     "load_lines": 334,
-    "load_bytes": 17351
+    "load_bytes": 17297
   },
   "agent-eval-standards": {
     "load_lines": 266,
@@ -31,12 +31,16 @@
     "load_lines": 330,
     "load_bytes": 18651
   },
+  "agent-skill-authoring": {
+    "load_lines": 238,
+    "load_bytes": 14585
+  },
   "agent-tool-standards": {
     "load_lines": 349,
     "load_bytes": 19087
   },
   "check-agent-standards": {
-    "load_lines": 325,
-    "load_bytes": 14426
+    "load_lines": 329,
+    "load_bytes": 15408
   }
 }
